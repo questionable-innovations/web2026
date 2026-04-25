@@ -9,8 +9,6 @@ export function EmailTemplate({ code }: EmailTemplateProps) {
 
   return (
     <>
-<<<<<<< HEAD
-=======
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
@@ -18,7 +16,6 @@ export function EmailTemplate({ code }: EmailTemplateProps) {
         href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
         rel="stylesheet"
       />
->>>>>>> d504d1913a43489a0214f95103ff0c10ffb247ae
       <div
         style={{
           fontFamily: 'Inter, Arial, sans-serif',

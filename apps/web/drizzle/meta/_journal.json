@@ -8,6 +8,13 @@
       "when": 1777086359014,
       "tag": "0000_cold_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1777092961993,
+      "tag": "0001_blue_dark_beast",
+      "breakpoints": true
     }
   ]
 }

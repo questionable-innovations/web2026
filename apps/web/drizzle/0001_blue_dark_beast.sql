@@ -1,0 +1,1 @@
+ALTER TABLE `contracts` ADD `signed_pdf_cid` text;

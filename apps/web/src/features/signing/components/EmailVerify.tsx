@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useEmailOtp } from "../hooks/useEmailOtp";
 
+/// Self-contained email-verify widget. Owns the email input so parent forms
+/// don't need to track a duplicate value that can drift out of sync with the
+/// verified address. `onVerified` fires once with the address that was
+/// actually verified — use that as the source of truth.
 export function EmailVerify({
   initialEmail = "",
   onVerified,
@@ -15,11 +19,7 @@ export function EmailVerify({
   const [code, setCode] = useState("");
 
   if (otp.stage === "verified") {
-    return (
-      <p className="text-sm text-emerald-300">
-        ✓ {otp.email} verified
-      </p>
-    );
+    return <p className="text-sm text-emerald-300">✓ {otp.email} verified</p>;
   }
 
   if (otp.stage === "sent" || otp.stage === "verifying") {
@@ -41,8 +41,8 @@ export function EmailVerify({
             type="button"
             disabled={code.length !== 6 || otp.stage === "verifying"}
             onClick={async () => {
-              await otp.verify(code);
-              if (otp.stage !== "error") onVerified(otp.email);
+              const ok = await otp.verify(code);
+              if (ok) onVerified(otp.email);
             }}
             className="rounded-md bg-[color:var(--color-accent)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
           >
@@ -62,22 +62,25 @@ export function EmailVerify({
   }
 
   return (
-    <div className="flex gap-2">
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@company.co"
-        className="flex-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2"
-      />
-      <button
-        type="button"
-        disabled={!email.includes("@") || otp.stage === "sending"}
-        onClick={() => otp.request(email)}
-        className="rounded-md bg-[color:var(--color-accent)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
-      >
-        {otp.stage === "sending" ? "…" : "Send code"}
-      </button>
+    <div className="space-y-1">
+      <div className="flex gap-2">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@company.co"
+          className="flex-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2"
+        />
+        <button
+          type="button"
+          disabled={!email.includes("@") || otp.stage === "sending"}
+          onClick={() => otp.request(email)}
+          className="rounded-md bg-[color:var(--color-accent)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+        >
+          {otp.stage === "sending" ? "…" : "Send code"}
+        </button>
+      </div>
+      {otp.error && <p className="text-xs text-red-400">{otp.error}</p>}
     </div>
   );
 }

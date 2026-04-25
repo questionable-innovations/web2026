@@ -13,6 +13,7 @@ const Body = z.object({
   pdfCid: z.string().min(1),
   escrowAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
   secretHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
+  dealDeadline: z.number().int().positive(),
   partyA: z.object({
     wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
     name: z.string().min(1),
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
       partyAName: d.partyA.name,
       partyAEmail: d.partyA.email,
       secretHash: d.secretHash,
+      dealDeadline: d.dealDeadline,
     }),
   });
   await db.insert(attestations).values({

@@ -9,7 +9,7 @@ export function useEmailOtp() {
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
 
-  async function request(value: string) {
+  async function request(value: string): Promise<boolean> {
     setError(null);
     setStage("sending");
     setEmail(value);
@@ -21,12 +21,13 @@ export function useEmailOtp() {
     if (!res.ok) {
       setError("Couldn't send code. Check the address.");
       setStage("error");
-      return;
+      return false;
     }
     setStage("sent");
+    return true;
   }
 
-  async function verify(code: string) {
+  async function verify(code: string): Promise<boolean> {
     setError(null);
     setStage("verifying");
     const res = await fetch("/api/otp/verify", {
@@ -37,9 +38,10 @@ export function useEmailOtp() {
     if (!res.ok) {
       setError("Wrong or expired code.");
       setStage("sent");
-      return;
+      return false;
     }
     setStage("verified");
+    return true;
   }
 
   function reset() {

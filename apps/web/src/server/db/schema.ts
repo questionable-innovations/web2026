@@ -7,6 +7,7 @@ export const contracts = sqliteTable("contracts", {
   title: text("title").notNull(),
   pdfCid: text("pdf_cid").notNull(),
   pdfHash: text("pdf_hash").notNull(),
+  signedPdfCid: text("signed_pdf_cid"),
   partyAWallet: text("party_a_wallet").notNull(),
   partyBWallet: text("party_b_wallet"),
   depositToken: text("deposit_token").notNull(),

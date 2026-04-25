@@ -4,7 +4,7 @@ import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ address: string }> },
 ) {
   const { address } = await params;
@@ -17,8 +17,11 @@ export async function GET(
   )[0];
   if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  const wantSigned = new URL(req.url).searchParams.get("signed") === "1";
+  const cid =
+    wantSigned && row.signedPdfCid ? row.signedPdfCid : row.pdfCid;
   const gateway = process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? "https://ipfs.io/ipfs/";
-  const upstream = await fetch(`${gateway}${row.pdfCid}`);
+  const upstream = await fetch(`${gateway}${cid}`);
   if (!upstream.ok) {
     return NextResponse.json({ error: "ipfs fetch failed" }, { status: 502 });
   }

@@ -16,6 +16,7 @@
     "better-sqlite3": "^11.5.0",
     "drizzle-orm": "^0.36.0",
     "next": "^15.1.0",
+    "pdf-lib": "^1.17.1",
     "pinata": "^1.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -27,6 +28,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0-beta.4",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",
@@ -36,7 +38,6 @@
     "eslint": "^9.15.0",
     "eslint-config-next": "^15.1.0",
     "tailwindcss": "^4.0.0-beta.4",
-    "@tailwindcss/postcss": "^4.0.0-beta.4",
     "typescript": "^5.6.3"
   }
 }

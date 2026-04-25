@@ -1,6 +1,18 @@
 // Hand-maintained until `contracts:build` is wired to emit typed ABIs.
 // Keep in sync with /contracts/src/*.sol.
 
+const attestationStructTuple = {
+  type: "tuple",
+  components: [
+    { name: "wallet", type: "address" },
+    { name: "nameHash", type: "bytes32" },
+    { name: "emailHash", type: "bytes32" },
+    { name: "pdfHash", type: "bytes32" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+
 export const escrowAbi = [
   {
     type: "function",
@@ -8,21 +20,24 @@ export const escrowAbi = [
     stateMutability: "nonpayable",
     inputs: [
       { name: "secret", type: "bytes32" },
-      {
-        name: "partyBAttestation",
-        type: "tuple",
-        components: [
-          { name: "wallet", type: "address" },
-          { name: "nameHash", type: "bytes32" },
-          { name: "emailHash", type: "bytes32" },
-          { name: "pdfHash", type: "bytes32" },
-          { name: "nonce", type: "uint256" },
-          { name: "deadline", type: "uint256" },
-        ],
-      },
+      { ...attestationStructTuple, name: "partyBAttestation" },
       { name: "partyBSignature", type: "bytes" },
     ],
     outputs: [],
+  },
+  {
+    type: "function",
+    name: "hashAttestation",
+    stateMutability: "pure",
+    inputs: [{ ...attestationStructTuple, name: "a" }],
+    outputs: [{ name: "", type: "bytes32" }],
+  },
+  {
+    type: "function",
+    name: "nonces",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",
@@ -82,19 +97,6 @@ export const escrowAbi = [
   },
 ] as const;
 
-const attestationTuple = {
-  name: "attestation",
-  type: "tuple",
-  components: [
-    { name: "wallet", type: "address" },
-    { name: "nameHash", type: "bytes32" },
-    { name: "emailHash", type: "bytes32" },
-    { name: "pdfHash", type: "bytes32" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-} as const;
-
 export const escrowFactoryAbi = [
   {
     type: "function",
@@ -122,7 +124,7 @@ export const escrowFactoryAbi = [
       { name: "dealDeadline", type: "uint64" },
       { name: "validUntil", type: "uint64" },
       { name: "secretHash", type: "bytes32" },
-      { ...attestationTuple, name: "partyAAttestation" },
+      { ...attestationStructTuple, name: "partyAAttestation" },
       { name: "partyASignature", type: "bytes" },
     ],
     outputs: [{ name: "escrow", type: "address" }],
@@ -140,7 +142,7 @@ export const escrowFactoryAbi = [
       { name: "dealDeadline", type: "uint64" },
       { name: "validUntil", type: "uint64" },
       { name: "secretHash", type: "bytes32" },
-      { ...attestationTuple, name: "partyAAttestation" },
+      { ...attestationStructTuple, name: "partyAAttestation" },
       { name: "partyASignature", type: "bytes" },
     ],
     outputs: [{ name: "escrow", type: "address" }],
@@ -201,19 +203,4 @@ export const erc20Abi = [
   },
 ] as const;
 
-/// EIP-712 typed-data shape for `signTypedData_v4`.
-export const attestationTypes = {
-  Attestation: [
-    { name: "wallet", type: "address" },
-    { name: "nameHash", type: "bytes32" },
-    { name: "emailHash", type: "bytes32" },
-    { name: "pdfHash", type: "bytes32" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-} as const;
-
-export const eip712Domain = {
-  name: "DealSeal",
-  version: "1",
-} as const;
+// EIP-712 helpers live in `@/lib/attestation`.

@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   Check,
   CornerDownRight,
 } from "lucide-react";
@@ -1112,6 +1113,18 @@ function ShareStep({
             <span>View signed PDF</span>
             <span className="text-accent">
               <ArrowDown size={14} />
+            </span>
+          </a>
+          <a
+            href={`https://testnet.snowtrace.io/address/${result.escrowAddress}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 flex items-center justify-between border border-rule px-3.5 py-2.5"
+            style={{ fontSize: 12 }}
+          >
+            <span>Verify on Snowtrace</span>
+            <span className="text-accent">
+              <ArrowUpRight size={14} />
             </span>
           </a>
         </div>

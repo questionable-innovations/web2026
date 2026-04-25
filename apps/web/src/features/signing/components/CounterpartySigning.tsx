@@ -174,13 +174,16 @@ function BLanding({
             <div className="font-serif" style={{ fontSize: 24, lineHeight: 1.1 }}>
               {info.partyAName ?? "Party A"}
             </div>
-            <div
-              className="mt-1 font-mono text-muted"
+            <a
+              href={`/b/${info.partyAWallet}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-block font-mono text-muted hover:text-ink"
               style={{ fontSize: 11 }}
             >
               {info.partyAWallet.slice(0, 6)}…{info.partyAWallet.slice(-4)} ·
               on-chain reputation
-            </div>
+            </a>
 
             <div
               className="mt-4 mb-4 border-t border-dashed"

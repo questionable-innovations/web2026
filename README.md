@@ -37,6 +37,22 @@ forge test
 forge script script/Deploy.s.sol --rpc-url fuji --broadcast
 ```
 
+To publish verified source code on Snowtrace when deploying to Fuji, set these
+in `.env` at the repo root:
+
+```bash
+DEPLOYER_PRIVATE_KEY=0x...
+SNOWTRACE_API_KEY=...
+NEXT_PUBLIC_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+```
+
+Then deploy:
+
+```bash
+pnpm contracts:deploy:fuji       # Git Bash / WSL
+pnpm contracts:deploy:fuji:win   # PowerShell on Windows
+```
+
 The deploy script prints the `Escrow impl` and `EscrowFactory` addresses —
 put the factory into `NEXT_PUBLIC_ESCROW_FACTORY` in `.env` and restart the
 web app.

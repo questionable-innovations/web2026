@@ -47,9 +47,6 @@ export function SignPayHero() {
   const tokenScale = 0.4 + tokenForm * 0.6;
   const tokenOpacity = tokenForm * fade;
 
-  const txText = "0x7b3c9a04e2d1bb877f0aa31c2e4d9f41e";
-  const txChars = Math.floor(txPrint * txText.length);
-
   const ink = "var(--color-ink)";
   const accent = "var(--color-accent)";
   const muted = "var(--color-muted)";
@@ -165,7 +162,9 @@ export function SignPayHero() {
           $4,800<span style={{ fontSize: 18, opacity: 0.5 }}> NZD</span>
         </div>
         <div style={{ height: 14 }} />
-        <div style={{ fontSize: 9, opacity: 0.5 }}>From 0xA1…39c → escrow</div>
+        <div style={{ fontSize: 9, opacity: 0.5 }}>
+          Counterparty funds move into escrow
+        </div>
         <div style={{ height: 8 }} />
         <div
           style={{
@@ -266,28 +265,11 @@ export function SignPayHero() {
           textAlign: "center",
           fontSize: 11,
           color: ink,
-          opacity: 0.7 * fade,
+          opacity: Math.max(0, txPrint) * 0.7 * fade,
         }}
       >
-        {txPrint > 0 && (
-          <>
-            <span style={{ color: muted }}>tx&nbsp;</span>
-            <span>{txText.slice(0, txChars)}</span>
-            {txChars < txText.length && (
-              <span
-                style={{
-                  background: ink,
-                  width: 6,
-                  display: "inline-block",
-                  height: 12,
-                  verticalAlign: "middle",
-                  marginLeft: 1,
-                  opacity: 0.5,
-                }}
-              />
-            )}
-          </>
-        )}
+        <span style={{ color: muted }}>result&nbsp;</span>
+        <span>escrow funded and active</span>
       </div>
 
       <div

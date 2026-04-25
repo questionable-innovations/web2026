@@ -1,4 +1,5 @@
 import { ReputationCard } from "@/features/reputation/components/ReputationCard";
+import { PageShell } from "@/components/AppShell";
 
 export default async function ReputationPage({
   params,
@@ -7,8 +8,8 @@ export default async function ReputationPage({
 }) {
   const { wallet } = await params;
   return (
-    <main className="min-h-screen bg-paper">
+    <PageShell active="reputation" wallet={wallet}>
       <ReputationCard wallet={wallet} />
-    </main>
+    </PageShell>
   );
 }

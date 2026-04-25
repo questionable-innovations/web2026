@@ -48,9 +48,9 @@ export async function POST(req: Request) {
     });
 
     return Response.json(object);
-  } catch (error) {
+  } catch (error: any) {
     console.error("PDF Extraction error:", error);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+    return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), {
       status: 500,
     });
   }

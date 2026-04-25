@@ -287,9 +287,13 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
         if (data.counterpartyName) setCounterpartyName(data.counterpartyName);
         if (data.counterpartyEmail) setCounterpartyEmail(data.counterpartyEmail);
         if (data.amount) setAmount(String(data.amount));
+      } else {
+        const errText = await res.text();
+        alert(`API Error: ${errText}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("AI Extraction failed", err);
+      alert(`Network Error: ${err.message}`);
     } finally {
       setIsAnalyzing(false);
     }

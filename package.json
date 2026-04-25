@@ -14,7 +14,7 @@
     "contracts:fmt": "cd contracts && forge fmt"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22 <24"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["better-sqlite3"]

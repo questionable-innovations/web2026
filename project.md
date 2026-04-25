@@ -47,13 +47,15 @@ DocuSign for web3: a PDF signing flow where signing *is* paying a deposit into a
 
 ### 3.4 Deadlock: "if they don't agree, the money sits there"
 
-- **Position (per brief):** deadlock is the *feature*, not the bug. Money stuck in the middle removes either party's incentive to stonewall — neither gets it until they agree. This mirrors how commercial retention clauses work.
+- **Position:** deadlock is the *feature*, not the bug. Money stuck in the middle removes either party's incentive to stonewall — neither gets it until they agree. This mirrors how commercial retention clauses work.
+- **Where disputes get resolved: in the traditional legal system, not on-chain.** DealSeal is not an arbitration platform and will never adjudicate. The smart contract's job is to *keep the funds safe and produce admissible evidence*, full stop. If the parties disagree, they take their lawyers, the signed PDF, the audit certificate, and the on-chain history to mediation, the Disputes Tribunal, or the District Court — same as any other commercial dispute. The contract just refuses to release until both sides sign off (or a long-horizon `rescue()` path triggers).
+- This framing keeps us out of the regulatory perimeter for arbitration/financial intermediation (§11.2) and out of the technical/social rabbit hole of building a fair on-chain jury.
 - Still a real edge case worth hardening later. Known failure modes to keep noting:
-  - One party genuinely disappears (death, business collapse, lost keys). Need a long-horizon escape hatch.
-  - Partial performance — work was 80% done, what's fair?
-  - Extortion in reverse (payee threatens reputational damage to force release).
-- **For v1:** implement the deadlock faithfully, but expose a `flagDispute()` that records the disagreement on-chain (visible in reputation). Social pressure + reputation cost is the pressure valve.
-- **Post-hackathon roadmap:** optional arbitration module (pre-agreed arbitrator address, or Kleros-style jury), milestone splits, and a very-long timeout (e.g. 2 years) for the "disappeared counterparty" case.
+  - One party genuinely disappears (death, business collapse, lost keys). Need a long-horizon escape hatch — this is what `rescue()` (§4.2) addresses, *not* dispute resolution.
+  - Partial performance — work was 80% done, what's fair? Off-chain negotiation, then court. Not our problem to model.
+  - Extortion in reverse (payee threatens reputational damage to force release). Reputation visibility is a feature; abuse via reputation is also resolvable through defamation / FTA channels.
+- **For v1:** expose a `flagDispute()` that freezes the deal and records the disagreement on-chain (visible in reputation). Surface the audit certificate + signed PDF as a downloadable "evidence pack" so users can hand them straight to counsel.
+- **Explicitly NOT on the roadmap:** crypto-native arbitration modules (Kleros-style juries, pre-agreed arbitrator addresses). Those add legal/technical complexity to solve a problem the existing legal system already solves. Milestone splits and the long-horizon `rescue()` timeout *are* on the roadmap; arbitration is not.
 
 ### 3.5 Wallet UX
 
@@ -167,7 +169,7 @@ Purely an **index + UX cache**. Nothing authoritative:
 
 - **In-flow fiat on-ramp.** Party B pays by card → Transak/Onramper mints dNZD → deposit happens in the same flow. Removes the "counterparty has no dNZD" dead end. Worth doing early-post-hackathon; too much moving-part risk for the demo itself.
 - **Commit-reveal countersign.** Eliminates the mempool front-run risk on the URL secret. Two-tx UX; only worth it if the exotic attack actually shows up.
-- **Arbitration module.** Pre-agreed arbitrator address or Kleros-style jury. Addresses the "genuine deadlock" edge case.
+- ~~**Arbitration module.**~~ Removed — disputes are resolved off-chain via the traditional legal system (§3.4). The smart contract holds funds and produces evidence; it does not adjudicate.
 - **Milestone splits.** Break the deposit into milestones, each released independently.
 - **Yield on escrow.** Route idle deposits into Aave/Benqi on Avalanche, split yield between parties at release. Adds smart-contract risk and complicates refunds.
 - **Verifiable credentials for identity.** Integrate with a DID method (did:ethr, did:pkh) so reputation is portable across platforms.
@@ -230,7 +232,7 @@ Purely an **index + UX cache**. Nothing authoritative:
 3. ~~**Name:**~~ Decided: **DealSeal**.
 4. ~~**ENS on Avalanche:**~~ On hold — see §10.
 5. ~~**Counterparty gating:**~~ Decided: **URL-secret capability model** (§4.2).
-6. **Dispute fallback:** deadlock-by-design for v1; long-horizon escape hatch and optional arbitration module on the roadmap.
+6. ~~**Dispute fallback:**~~ Decided: deadlock-by-design; disputes resolved off-chain via traditional legal channels (§3.4). On-chain `flagDispute()` freezes funds and records the disagreement; the audit certificate + signed PDF are the artifacts you take to your lawyer. No arbitration module — ever.
 7. **Chain:** Fuji testnet for demo (design contracts to be L1-portable). Confirm.
 8. **Team size + deadline:** how many people, how many days until the hackathon? Governs what's realistic from §7.
 9. **dNZD on Avalanche status:** does New Money have a native C-chain deployment? If not, commit to USDC for the demo and keep dNZD as the roadmap story. Need to email New Money this week.

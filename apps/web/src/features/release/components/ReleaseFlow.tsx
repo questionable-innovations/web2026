@@ -320,19 +320,13 @@ function Inner({
         </Banner>
       )}
       {status.state === "Disputed" && (
-        <Banner tone="alert">
-          A dispute is on record by{" "}
-          {status.disputedBy?.slice(0, 6)}…{status.disputedBy?.slice(-4)}.
-          Funds stay in escrow until it&apos;s cancelled.
-          {status.disputeReason && (
-            <>
-              <br />
-              <span className="font-mono" style={{ fontSize: 11 }}>
-                reason: {status.disputeReason}
-              </span>
-            </>
-          )}
-        </Banner>
+        <DisputeBanner
+          disputedBy={status.disputedBy}
+          reason={status.disputeReason}
+          escrowAddress={escrowAddress}
+          hasAuditCert={Boolean(pinnedCid)}
+          hasSignedPdf={Boolean(status.signedPdfCid)}
+        />
       )}
       {status.state === "Released" && (
         <Banner tone="ok">
@@ -418,14 +412,30 @@ function Inner({
 
             {showDispute && (
               <div
-                className="mt-4 border border-rule bg-paper p-4"
-                style={{ borderColor: "var(--color-rule)" }}
+                className="mt-4 border border-accent bg-paper p-4"
               >
                 <div
-                  className="mb-2 font-mono uppercase text-muted"
+                  className="mb-1 font-mono uppercase text-accent"
                   style={{ fontSize: 10, letterSpacing: 1 }}
                 >
-                  Dispute reason (recorded on-chain)
+                  Flag a dispute · funds freeze
+                </div>
+                <p
+                  className="mb-3 leading-relaxed text-ink/80"
+                  style={{ fontSize: 13 }}
+                >
+                  DealSeal does not arbitrate. Flagging a dispute keeps the
+                  funds in escrow and records the disagreement on-chain — you
+                  and your counterparty resolve it the same way you&apos;d
+                  resolve any commercial dispute (negotiation, mediation,
+                  Disputes Tribunal, District Court). The signed PDF and
+                  audit certificate below are your evidence.
+                </p>
+                <div
+                  className="mb-1.5 font-mono uppercase text-muted"
+                  style={{ fontSize: 10, letterSpacing: 1 }}
+                >
+                  Reason (recorded on-chain · visible in reputation)
                 </div>
                 <textarea
                   value={disputeReason}
@@ -433,11 +443,11 @@ function Inner({
                   rows={3}
                   className="w-full bg-paper p-2 text-sm"
                   style={{ border: "1px solid var(--color-rule)" }}
-                  placeholder="e.g. work not delivered as agreed in §3"
+                  placeholder="e.g. deliverable §3 not met — see exhibits in lawyer's letter"
                 />
                 <div className="mt-2 flex gap-2">
                   <ActionButton
-                    label="Submit dispute"
+                    label="Freeze funds & flag dispute"
                     primary
                     pending={stage === "disputing"}
                     onClick={onDispute}
@@ -761,6 +771,112 @@ function PartyCard({
           {wallet.slice(0, 6)}…{wallet.slice(-4)}
         </div>
       )}
+    </div>
+  );
+}
+
+function DisputeBanner({
+  disputedBy,
+  reason,
+  escrowAddress,
+  hasAuditCert,
+  hasSignedPdf,
+}: {
+  disputedBy: `0x${string}` | null;
+  reason: string | null;
+  escrowAddress: string;
+  hasAuditCert: boolean;
+  hasSignedPdf: boolean;
+}) {
+  return (
+    <div
+      className="border border-accent bg-paper px-5 py-4"
+      style={{ borderLeftWidth: 3 }}
+    >
+      <div
+        className="font-mono uppercase text-accent"
+        style={{ fontSize: 11, letterSpacing: 2 }}
+      >
+        ⚑ Dispute on record · funds frozen
+      </div>
+      <p
+        className="mt-2 leading-relaxed text-ink"
+        style={{ fontSize: 14 }}
+      >
+        Flagged by{" "}
+        <span className="font-mono">
+          {disputedBy?.slice(0, 6)}…{disputedBy?.slice(-4)}
+        </span>
+        . Neither side can release the deposit until the flagging party
+        cancels the dispute, or you both agree.
+      </p>
+      <p
+        className="mt-2 leading-relaxed text-ink/75"
+        style={{ fontSize: 13 }}
+      >
+        <strong>DealSeal does not adjudicate.</strong> Disputes are resolved
+        through the same channels as any commercial disagreement — direct
+        negotiation, mediation, the Disputes Tribunal (claims under
+        $30,000), or the District Court. We hold the funds and produce the
+        evidence; the legal system decides who&apos;s right.
+      </p>
+
+      {reason && (
+        <div
+          className="mt-3 border border-rule bg-card px-3.5 py-2.5 font-mono"
+          style={{ fontSize: 11, lineHeight: 1.6 }}
+        >
+          <span className="text-muted">on-chain reason:</span> {reason}
+        </div>
+      )}
+
+      <div className="mt-4">
+        <div
+          className="ds-eyebrow mb-2"
+          style={{ color: "var(--color-accent)" }}
+        >
+          Evidence pack
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          {hasSignedPdf && (
+            <a
+              href={`/api/contracts/${escrowAddress}/pdf?signed=1`}
+              target="_blank"
+              rel="noreferrer"
+              className="border border-ink px-3 py-2 text-ink"
+              style={{ fontSize: 12 }}
+            >
+              ↓ Signed PDF
+            </a>
+          )}
+          <a
+            href={`/api/contracts/${escrowAddress}/certificate`}
+            target="_blank"
+            rel="noreferrer"
+            className="border border-ink px-3 py-2 text-ink"
+            style={{ fontSize: 12 }}
+          >
+            ↓ Audit certificate {hasAuditCert ? "(IPFS-pinned)" : ""}
+          </a>
+          <a
+            href={`https://testnet.snowtrace.io/address/${escrowAddress}`}
+            target="_blank"
+            rel="noreferrer"
+            className="border border-ink px-3 py-2 text-ink"
+            style={{ fontSize: 12 }}
+          >
+            ↗ On-chain history
+          </a>
+        </div>
+        <p
+          className="mt-2.5 font-mono text-muted"
+          style={{ fontSize: 11, lineHeight: 1.6 }}
+        >
+          Hand these to your lawyer. The signed PDF carries both
+          signatures; the certificate links each signer&apos;s identity to
+          their wallet, EIP-712 signature, and the on-chain tx history.
+        </p>
+      </div>
     </div>
   );
 }

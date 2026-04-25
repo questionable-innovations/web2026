@@ -13,6 +13,7 @@ interface IEscrowFactory {
     function recordCountersign(address partyB) external;
     function aavePool() external view returns (address);
     function platformWallet() external view returns (address);
+    function aaveSupportedToken() external view returns (address);
 }
 
 interface IPool {
@@ -104,6 +105,7 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
     error CannotApproveOwnProposal();
     error InvalidInit();
     error NotDisputer();
+    error AaveShortfall();
 
     modifier inState(State s) {
         if (state != s) revert WrongState(s, state);
@@ -182,10 +184,18 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
             revert TransferAmountMismatch();
         }
 
-        // Supply the deposited tokens to Aave Pool
-        address aavePool = IEscrowFactory(factory).aavePool();
+        // Yield-on-escrow: supply to Aave only if this clone's token is the
+        // factory-allowlisted Aave asset. Tokens outside that set (dNZD etc.)
+        // sit idle in the escrow — supplying an unlisted asset would revert
+        // and brick countersign for everyone.
+        address aavePool = _aavePoolForToken();
         if (aavePool != address(0)) {
-            token.approve(aavePool, amount);
+            // forceApprove handles tokens (e.g. USDT) that revert when an
+            // existing non-zero allowance is overwritten. With a fresh clone
+            // there's no prior allowance, but the implementation could be
+            // reused via clones for many deals against the same token, so we
+            // don't rely on the zero-allowance assumption.
+            token.forceApprove(aavePool, amount);
             IPool(aavePool).supply(address(token), amount, address(this), 0);
         }
 
@@ -222,23 +232,23 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
         withdrawable = 0;
         state = State.Closed;
 
-        address aavePool = IEscrowFactory(factory).aavePool();
+        address aavePool = _aavePoolForToken();
         if (aavePool != address(0)) {
-            uint256 totalWithdrawn = IPool(aavePool).withdraw(address(token), type(uint256).max, address(this));
-            if (totalWithdrawn > amt) {
-                address platformWallet = IEscrowFactory(factory).platformWallet();
-                if (platformWallet != address(0)) {
-                    token.safeTransfer(platformWallet, totalWithdrawn - amt);
-                }
-            } else {
-                amt = totalWithdrawn;
+            // Pull principal + interest out of Aave in one call. If the pool
+            // returns less than the principal (frozen / capped / paused),
+            // revert the whole tx — the state mutations above unwind, so
+            // partyA can retry once Aave is healthy. We never silently send
+            // less than the released amount.
+            uint256 totalWithdrawn =
+                IPool(aavePool).withdraw(address(token), type(uint256).max, address(this));
+            if (totalWithdrawn < amt) revert AaveShortfall();
+            uint256 interest = totalWithdrawn - amt;
+            if (interest > 0) {
+                token.safeTransfer(IEscrowFactory(factory).platformWallet(), interest);
             }
         }
 
-        if (amt > 0) {
-            token.safeTransfer(partyA, amt);
-        }
-
+        token.safeTransfer(partyA, amt);
         emit Withdrawn(partyA, amt);
     }
 
@@ -290,24 +300,18 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
         if (block.timestamp < uint256(deadline) + RESCUE_TIMEOUT) {
             revert RescueTimeoutNotReached();
         }
-        
-        address aavePool = IEscrowFactory(factory).aavePool();
-        uint256 bal = amount;
 
+        // Best-effort drain of Aave so the rescuer gets principal *and* yield.
+        // Wrapped in try/catch because Aave being broken is a plausible cause
+        // for needing rescue in the first place — we must never make rescue
+        // depend on a healthy pool. Whatever doesn't come back stays put;
+        // we sweep the actual on-contract balance below.
+        address aavePool = _aavePoolForToken();
         if (aavePool != address(0)) {
-            uint256 totalWithdrawn = IPool(aavePool).withdraw(address(token), type(uint256).max, address(this));
-            if (totalWithdrawn > bal) {
-                address platformWallet = IEscrowFactory(factory).platformWallet();
-                if (platformWallet != address(0)) {
-                    token.safeTransfer(platformWallet, totalWithdrawn - bal);
-                }
-            } else {
-                bal = totalWithdrawn;
-            }
-        } else {
-            bal = token.balanceOf(address(this));
+            try IPool(aavePool).withdraw(address(token), type(uint256).max, address(this))
+            returns (uint256) {} catch {}
         }
-
+        uint256 bal = token.balanceOf(address(this));
         if (bal == 0) revert NothingToWithdraw();
 
         // For the v1 demo, send to caller. Full fix (try partyA first, fall
@@ -319,6 +323,17 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
         state = State.Rescued;
         token.safeTransfer(recipient, bal);
         emit Rescued(recipient, bal);
+    }
+
+    /// @dev Returns the Aave pool to use for this clone's token, or zero if
+    ///      Aave shouldn't be touched. Centralised so deposit/withdraw/rescue
+    ///      stay symmetric — they must agree on whether funds are in Aave.
+    function _aavePoolForToken() internal view returns (address) {
+        IEscrowFactory f = IEscrowFactory(factory);
+        address pool = f.aavePool();
+        if (pool == address(0)) return address(0);
+        if (address(token) != f.aaveSupportedToken()) return address(0);
+        return pool;
     }
 
     // ------------------------------------------------------------------

@@ -23,7 +23,9 @@ contract EscrowTest is Test {
 
     function setUp() public {
         impl = new Escrow();
-        factory = new EscrowFactory(address(impl));
+        // Aave integration disabled in unit tests: all three Aave-related
+        // addresses zero. The factory enforces that they move together.
+        factory = new EscrowFactory(address(impl), address(0), address(0), address(0));
         token = new MockToken();
         alice = vm.createWallet("alice");
         bob = vm.createWallet("bob");

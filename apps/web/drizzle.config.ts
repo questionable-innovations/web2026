@@ -1,0 +1,13 @@
+import type { Config } from "drizzle-kit";
+
+export default {
+  schema: "./src/server/db/schema.ts",
+  out: "./drizzle",
+  dialect: "sqlite",
+  dbCredentials: {
+    url: (process.env.DATABASE_URL ?? "file:./data/app.db").replace(
+      /^file:/,
+      "",
+    ),
+  },
+} satisfies Config;

@@ -31,7 +31,7 @@ type ContractData = {
   state: string;
 };
 
-const isUsdc = (t: string) => t.toLowerCase() === USDC_AVALANCHE.toLowerCase();
+const isUsdc = (t?: string | null) => t ? t.toLowerCase() === USDC_AVALANCHE.toLowerCase() : false;
 
 export function AdminContractsTable({ contracts }: { contracts: ContractData[] }) {
   // Only query aUSDC for USDC-denominated contracts. Other tokens (dNZD etc.)
@@ -83,7 +83,12 @@ export function AdminContractsTable({ contracts }: { contracts: ContractData[] }
         </thead>
         <tbody className="divide-y">
           {contracts.map((c, i) => {
-            const rawPrincipal = BigInt(c.depositAmount || "0");
+            let rawPrincipal = 0n;
+            try {
+              rawPrincipal = BigInt(c.depositAmount || "0");
+            } catch (e) {
+              rawPrincipal = 0n;
+            }
             const usdc = isUsdc(c.depositToken);
             const balanceIdx = usdcIndexMap.get(i);
             const aBalanceRaw =

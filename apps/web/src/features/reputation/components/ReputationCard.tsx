@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import {
   TIER_LABEL,
   TIER_NAME,
@@ -157,12 +157,16 @@ export function ReputationCard({ wallet }: { wallet: string }) {
         >
           {headline}
         </h1>
-        <div
-          className="font-mono text-muted"
+        <a
+          href={`https://testnet.snowtrace.io/address/${data.wallet}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 font-mono text-muted hover:text-ink"
           style={{ fontSize: 12, letterSpacing: 0.4 }}
         >
           {wallet}
-        </div>
+          <ArrowUpRight size={12} />
+        </a>
         <div className="mt-2 text-base text-muted">
           First seen {firstSeenLabel} · Banded value tier{" "}
           {TIER_LABEL[stats.valueTier]}

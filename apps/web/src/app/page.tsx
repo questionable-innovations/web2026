@@ -656,7 +656,31 @@ function Footer() {
     >
       <span>DEALSEAL.NZ · © 2026</span>
       <span>{`NON-CUSTODIAL · ${activeChain.name.toUpperCase()} · ${depositToken.symbol.toUpperCase()} DEPOSIT FLOW`}</span>
-      <span><a href = "https://github.com/questionable-innovations/web2026">SOURCE</a> · <a href = "https://github.com/questionable-innovations/web2026">CONTRACTS</a> · <a href = "https://github.com/questionable-innovations/web2026">LEGAL</a></span>
+      <span>
+        <a
+          href="https://github.com/questionable-innovations/web2026"
+          target="_blank"
+          rel="noreferrer"
+        >
+          SOURCE
+        </a>
+        {" · "}
+        <a
+          href="https://github.com/questionable-innovations/web2026/tree/main/contracts"
+          target="_blank"
+          rel="noreferrer"
+        >
+          CONTRACTS
+        </a>
+        {" · "}
+        <a
+          href="https://github.com/questionable-innovations/web2026/blob/main/LICENSE.md"
+          target="_blank"
+          rel="noreferrer"
+        >
+          LEGAL
+        </a>
+      </span>
     </footer>
   );
 }

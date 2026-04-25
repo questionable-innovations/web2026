@@ -6,7 +6,7 @@ import { readSecretFromHash } from "@/lib/share-link";
 import { BrandMark, PdfThumb, Seal } from "@/components/AppShell";
 import { PdfViewer } from "./PdfViewer";
 import { SignAndPay } from "./SignAndDeposit";
-import { depositToken } from "@/lib/chain";
+import { getDepositTokenByAddress } from "@/lib/chain";
 
 type ContractInfo = {
   escrowAddress: `0x${string}`;
@@ -121,6 +121,8 @@ function BLanding({
   info: ContractInfo;
   onContinue: () => void;
 }) {
+  const selectedToken = getDepositTokenByAddress(info.depositToken);
+
   return (
     <div className="min-h-screen bg-paper px-16 py-7">
       <div className="mb-5 flex items-center justify-between">
@@ -173,13 +175,16 @@ function BLanding({
             <div className="font-serif" style={{ fontSize: 24, lineHeight: 1.1 }}>
               {info.partyAName ?? "Party A"}
             </div>
-            <div
-              className="mt-1 font-mono text-muted"
+            <a
+              href={`/b/${info.partyAWallet}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-block font-mono text-muted hover:text-ink"
               style={{ fontSize: 11 }}
             >
               {info.partyAWallet.slice(0, 6)}…{info.partyAWallet.slice(-4)} ·
               on-chain reputation
-            </div>
+            </a>
 
             <div
               className="mt-4 mb-4 border-t border-dashed"
@@ -202,7 +207,7 @@ function BLanding({
                     ${Number(info.totalDue).toLocaleString()}
                     <span className="text-muted" style={{ fontSize: 14 }}>
                       {" "}
-                      {depositToken.symbol}
+                      {selectedToken.symbol}
                     </span>
                   </div>
                 </div>
@@ -221,7 +226,7 @@ function BLanding({
                   ${Number(info.depositAmount).toLocaleString()}
                   <span className="text-muted" style={{ fontSize: 14 }}>
                     {" "}
-                    {depositToken.symbol}
+                    {selectedToken.symbol}
                   </span>
                 </div>
               </div>
@@ -353,6 +358,8 @@ function BSignPay({
 }
 
 function BReceipt({ info }: { info: ContractInfo }) {
+  const selectedToken = getDepositTokenByAddress(info.depositToken);
+
   return (
     <div className="min-h-screen bg-paper px-16 py-8">
       <div className="mb-6 flex items-center justify-between">
@@ -460,13 +467,13 @@ function BReceipt({ info }: { info: ContractInfo }) {
             />
             <ReceiptRow
               k="amount"
-              v={`${info.depositAmount} ${depositToken.symbol}`}
+              v={`${info.depositAmount} ${selectedToken.symbol}`}
               accent
             />
             {info.totalDue && (
               <ReceiptRow
                 k="totalDue"
-                v={`${info.totalDue} ${depositToken.symbol}`}
+                v={`${info.totalDue} ${selectedToken.symbol}`}
               />
             )}
             <ReceiptRow k="release" v="requires both signatures" />

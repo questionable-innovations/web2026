@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowUpRight, AlertTriangle, Check, RefreshCw } from "lucide-react";
 import { formatUnits } from "viem";
 import { useBalance, useReadContract } from "wagmi";
-import { activeChain, depositToken } from "@/lib/chain";
+import { activeChain } from "@/lib/chain";
 import { erc20Abi } from "@/lib/contracts/abis";
 
 /// Shown to Party B on the sign & deposit screen when their balance is below
@@ -15,12 +15,14 @@ import { erc20Abi } from "@/lib/contracts/abis";
 export function FundWalletPanel({
   wallet,
   needed,
+  tokenAddress,
   symbol,
   decimals,
   refetchBalance,
 }: {
   wallet: `0x${string}`;
   needed: bigint;
+  tokenAddress: `0x${string}`;
   symbol: string;
   decimals: number;
   refetchBalance: () => Promise<unknown>;
@@ -32,7 +34,7 @@ export function FundWalletPanel({
 
   const native = useBalance({ address: wallet, chainId: activeChain.id });
   const erc20 = useReadContract({
-    address: depositToken.address,
+    address: tokenAddress,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [wallet],
@@ -105,10 +107,10 @@ export function FundWalletPanel({
         />
         <FundRow
           label={`${symbol} contract`}
-          value={depositToken.address}
-          copyValue={depositToken.address}
+          value={tokenAddress}
+          copyValue={tokenAddress}
           copied={copied === "token"}
-          onCopy={() => copy(depositToken.address, "token")}
+          onCopy={() => copy(tokenAddress, "token")}
           hint="Add to wallet, then Import token"
         />
       </div>

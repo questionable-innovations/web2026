@@ -11,7 +11,7 @@ contract Deploy is Script {
         uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(pk);
         Escrow impl = new Escrow();
-        
+
         // Use 0x0 for platformWallet and aavePool initially, or placeholders if not set
         // Aave V3 on Avalanche C-Chain: 0x794a61358D6845594F94dc1DB02A252b5b4814aD
         address platformWallet = vm.envOr("PLATFORM_WALLET", address(0));

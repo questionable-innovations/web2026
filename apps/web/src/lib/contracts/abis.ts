@@ -90,6 +90,13 @@ export const escrowAbi = [
   },
   {
     type: "function",
+    name: "token",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
     name: "validUntil",
     stateMutability: "view",
     inputs: [],

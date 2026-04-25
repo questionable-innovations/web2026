@@ -12,6 +12,7 @@ const Body = z.object({
   counterpartyName: z.string().min(1).optional(),
   amount: z.string().regex(/^\d+(\.\d+)?$/),
   totalDue: z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  depositToken: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   pdfHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   pdfCid: z.string().min(1),
   escrowAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
@@ -86,6 +87,14 @@ export async function POST(req: Request) {
       { status: 409 },
     );
   }
+  const depositToken =
+    d.depositToken ?? process.env.NEXT_PUBLIC_DEPOSIT_TOKEN ?? "0x0";
+  if (onchain.token.toLowerCase() !== depositToken.toLowerCase()) {
+    return NextResponse.json(
+      { error: "deposit token mismatch" },
+      { status: 409 },
+    );
+  }
 
   const id = randomUUID();
   await db.insert(contracts).values({
@@ -95,7 +104,7 @@ export async function POST(req: Request) {
     pdfCid: d.pdfCid,
     pdfHash: d.pdfHash,
     partyAWallet: d.partyA.wallet.toLowerCase(),
-    depositToken: process.env.NEXT_PUBLIC_DEPOSIT_TOKEN ?? "0x0",
+    depositToken: depositToken.toLowerCase(),
     depositAmount: d.amount,
     totalDue: d.totalDue,
     state: "AwaitingCounterparty",

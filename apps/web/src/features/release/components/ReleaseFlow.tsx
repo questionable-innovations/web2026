@@ -17,6 +17,7 @@ import {
 import { StateBadge } from "@/components/AppShell";
 import { WalletGate } from "@/features/signing/components/WalletGate";
 import { ChainGate } from "@/features/signing/components/ChainGate";
+import { PdfViewer } from "@/features/signing/components/PdfViewer";
 import { escrowAbi } from "@/lib/contracts/abis";
 import { depositToken } from "@/lib/chain";
 
@@ -609,6 +610,20 @@ function Inner({
                 hint="pinned on release · CCLA s.229"
               />
             )}
+          </div>
+
+          <div className="mb-5 border border-rule bg-card p-4.5">
+            <div
+              className="mb-3 flex justify-between font-mono uppercase text-muted"
+              style={{ fontSize: 10, letterSpacing: 1 }}
+            >
+              <span>{status.title}</span>
+              <span>
+                SHA256 · {status.pdfHash.slice(0, 6)}…
+                {status.pdfHash.slice(-4)}
+              </span>
+            </div>
+            <PdfViewer escrowAddress={escrowAddress} signed />
           </div>
 
           <div className="ds-eyebrow mb-2">

@@ -21,6 +21,7 @@ import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
 import { ChainGate } from "./ChainGate";
 import { ProfileGate, type Profile } from "./ProfileGate";
+import { FundWalletPanel } from "./FundWalletPanel";
 
 type ContractInfo = {
   escrowAddress: `0x${string}`;
@@ -101,7 +102,7 @@ function Inner({
     abi: escrowAbi,
     functionName: "amount",
   });
-  const { data: balance } = useReadContract({
+  const { data: balance, refetch: refetchBalance } = useReadContract({
     address: info.depositToken,
     abi: erc20Abi,
     functionName: "balanceOf",
@@ -259,19 +260,12 @@ function Inner({
     }
   }
 
-  // Inputs styled for the dark Sign-&-Pay panel.
-  const fieldBg = "rgba(255,255,255,0.04)";
-  const fieldBorder = "1px solid rgba(255,255,255,0.14)";
-
   return (
     <div className="space-y-5">
-      <div
-        className="p-5"
-        style={{ background: fieldBg, border: fieldBorder }}
-      >
+      <div className="border border-ink-rule bg-ink-card p-5">
         <div
-          className="mb-3.5 flex items-baseline justify-between font-mono uppercase"
-          style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", letterSpacing: 1 }}
+          className="mb-3.5 flex items-baseline justify-between font-mono uppercase text-ink-muted"
+          style={{ fontSize: 10, letterSpacing: 1 }}
         >
           <span>You will deposit</span>
           {balance !== undefined && (
@@ -284,16 +278,14 @@ function Inner({
         </div>
         <div className="font-serif" style={{ fontSize: 56, lineHeight: 1 }}>
           ${Number(info.depositAmount).toLocaleString()}
-          <span
-            style={{ fontSize: 18, color: "rgba(255,255,255,0.6)" }}
-          >
+          <span className="text-ink-muted" style={{ fontSize: 18 }}>
             {" "}
             NZD
           </span>
         </div>
         <div
-          className="mt-1.5 font-mono"
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}
+          className="mt-1.5 font-mono text-ink-soft"
+          style={{ fontSize: 11 }}
         >
           = {depositLabel} · into escrow{" "}
           {info.escrowAddress.slice(0, 6)}…{info.escrowAddress.slice(-4)}
@@ -301,74 +293,54 @@ function Inner({
 
         <div className="mt-5">
           <div
-            className="mb-1.5 font-mono uppercase"
-            style={{
-              fontSize: 10,
-              color: "rgba(255,255,255,0.6)",
-              letterSpacing: 1,
-            }}
+            className="mb-1.5 font-mono uppercase text-ink-muted"
+            style={{ fontSize: 10, letterSpacing: 1 }}
           >
             Type the amount to confirm
           </div>
           <div
-            className="flex items-center gap-2.5 px-3.5 py-3 font-mono"
+            className="flex items-center gap-2.5 px-3.5 py-3 font-mono text-paper"
             style={{
               background: "var(--color-ink)",
               border: `1px solid ${
                 confirm.length === 0
-                  ? "rgba(255,255,255,0.14)"
-                  : confirmMatches
-                  ? "var(--color-accent)"
+                  ? "var(--color-ink-rule)"
                   : "var(--color-accent)"
               }`,
               fontSize: 14,
-              color: "var(--color-paper)",
             }}
           >
-            <span style={{ color: "var(--color-accent)" }}>$</span>
+            <span className="text-accent">$</span>
             <input
               inputMode="numeric"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value.replace(/\D/g, ""))}
               placeholder={wholeAmount}
-              className="flex-1 bg-transparent outline-none"
-              style={{ color: "var(--color-paper)" }}
+              className="flex-1 bg-transparent text-paper outline-none placeholder:text-ink-faint"
             />
-            <span
-              style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}
-            >
+            <span className="text-ink-muted" style={{ fontSize: 11 }}>
               {confirmMatches ? "matches ✓" : `must equal ${wholeAmount}`}
             </span>
           </div>
         </div>
       </div>
 
-      <div
-        className="p-4"
-        style={{ background: fieldBg, border: fieldBorder }}
-      >
+      <div className="border border-ink-rule bg-ink-card p-4">
         <div
-          className="mb-2 flex items-baseline justify-between font-mono uppercase"
-          style={{
-            fontSize: 10,
-            letterSpacing: 1,
-            color: "rgba(255,255,255,0.6)",
-          }}
+          className="mb-2 flex items-baseline justify-between font-mono uppercase text-ink-muted"
+          style={{ fontSize: 10, letterSpacing: 1 }}
         >
           <span>Signing as</span>
-          <a
-            href="/settings"
-            style={{ color: "var(--color-accent)" }}
-          >
+          <a href="/settings" className="text-accent">
             EDIT
           </a>
         </div>
-        <div style={{ fontSize: 14, color: "var(--color-paper)" }}>
+        <div className="text-paper" style={{ fontSize: 14 }}>
           {profile.name}
         </div>
         <div
-          className="mt-0.5 font-mono"
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}
+          className="mt-0.5 font-mono text-ink-soft"
+          style={{ fontSize: 11 }}
         >
           {profile.email} · verified
         </div>
@@ -376,12 +348,8 @@ function Inner({
 
       <div>
         <div
-          className="mb-2 font-mono uppercase"
-          style={{
-            fontSize: 10,
-            color: "rgba(255,255,255,0.6)",
-            letterSpacing: 1,
-          }}
+          className="mb-2 font-mono uppercase text-ink-muted"
+          style={{ fontSize: 10, letterSpacing: 1 }}
         >
           Your signature
         </div>
@@ -390,23 +358,16 @@ function Inner({
         </div>
       </div>
 
-      <div
-        className="p-4.5"
-        style={{ background: fieldBg, border: fieldBorder }}
-      >
+      <div className="border border-ink-rule bg-ink-card p-4.5">
         <div
-          className="mb-2.5 font-mono uppercase"
-          style={{
-            fontSize: 10,
-            color: "rgba(255,255,255,0.6)",
-            letterSpacing: 1,
-          }}
+          className="mb-2.5 font-mono uppercase text-ink-muted"
+          style={{ fontSize: 10, letterSpacing: 1 }}
         >
           You will sign over
         </div>
         <div
-          className="font-mono"
-          style={{ fontSize: 11, lineHeight: 1.8, color: "rgba(255,255,255,0.85)" }}
+          className="font-mono text-ink-soft"
+          style={{ fontSize: 11, lineHeight: 1.8 }}
         >
           <KV
             k="pdfHash"
@@ -422,13 +383,14 @@ function Inner({
         </div>
       </div>
 
-      {insufficient && (
-        <p
-          className="font-mono text-accent"
-          style={{ fontSize: 11 }}
-        >
-          Wallet balance is below {depositLabel}. Top up before signing.
-        </p>
+      {insufficient && onchainAmount !== undefined && (
+        <FundWalletPanel
+          wallet={wallet}
+          needed={onchainAmount as bigint}
+          symbol={depositToken.symbol}
+          decimals={decimals}
+          refetchBalance={refetchBalance}
+        />
       )}
 
       <button
@@ -465,12 +427,8 @@ function Inner({
         </p>
       )}
       <p
-        className="font-mono"
-        style={{
-          fontSize: 10,
-          color: "rgba(255,255,255,0.6)",
-          lineHeight: 1.5,
-        }}
+        className="font-mono text-ink-muted"
+        style={{ fontSize: 10, lineHeight: 1.5 }}
       >
         ↳ Funds release only when both you and{" "}
         {info.partyAName ?? "Party A"} approve. We never custody them.
@@ -482,10 +440,8 @@ function Inner({
 function KV({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
   return (
     <div className="flex justify-between">
-      <span style={{ color: "rgba(255,255,255,0.7)" }}>{k}</span>
-      <span style={{ color: accent ? "var(--color-accent)" : undefined }}>
-        {v}
-      </span>
+      <span className="text-ink-soft">{k}</span>
+      <span className={accent ? "text-accent" : undefined}>{v}</span>
     </div>
   );
 }

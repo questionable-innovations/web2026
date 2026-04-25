@@ -279,7 +279,7 @@ function DetailsStep({
   const [amount, setAmount] = useState(initial?.amount ?? "");
   const [totalDue, setTotalDue] = useState(initial?.totalDue ?? "");
   const [days, setDays] = useState(() => {
-    if (!initial) return "30";
+    if (!initial) return "";
     const remaining = Math.round(
       (initial.dealDeadline - Date.now() / 1000) / 86_400,
     );
@@ -307,6 +307,7 @@ function DetailsStep({
         if (data.counterpartyEmail) setCounterpartyEmail(data.counterpartyEmail);
         if (data.amount) setAmount(String(data.amount));
         if (data.totalDue) setTotalDue(String(data.totalDue));
+        if (data.daysUntilDeadline) setDays(String(data.daysUntilDeadline));
       } else {
         const errText = await res.text();
         alert(`API Error: ${errText}`);

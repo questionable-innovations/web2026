@@ -137,6 +137,63 @@ export const escrowAbi = [
     inputs: [],
     outputs: [],
   },
+  {
+    type: "function",
+    name: "proposedReleaseBy",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "withdrawable",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "disputedBy",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "disputeReason",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "event",
+    name: "ReleaseProposed",
+    inputs: [{ name: "by", type: "address", indexed: true }],
+  },
+  {
+    type: "event",
+    name: "ReleaseApproved",
+    inputs: [
+      { name: "by", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Withdrawn",
+    inputs: [
+      { name: "to", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Disputed",
+    inputs: [
+      { name: "by", type: "address", indexed: true },
+      { name: "reason", type: "string", indexed: false },
+    ],
+  },
 ] as const;
 
 export const escrowFactoryAbi = [

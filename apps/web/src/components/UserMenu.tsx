@@ -12,6 +12,7 @@ import { formatUnits } from "viem";
 import { usePrivy } from "@privy-io/react-auth";
 import { activeChain, depositToken } from "@/lib/chain";
 import { erc20Abi } from "@/lib/contracts/abis";
+import { useEnsName, shortAddress } from "@/lib/ens-client";
 
 type Profile = { wallet: string; name: string; email: string };
 
@@ -79,7 +80,9 @@ export function UserMenu() {
 
   const privyEmail = privy?.user?.email?.address ?? null;
   const privyGoogle = privy?.user?.google ?? null;
-  const displayName = profile?.name ?? privyGoogle?.name ?? null;
+  const ensName = useEnsName(address ?? null);
+  const displayName =
+    profile?.name ?? privyGoogle?.name ?? ensName ?? null;
   const displayEmail = profile?.email ?? privyEmail ?? privyGoogle?.email ?? null;
 
   const initial = useMemo(() => {
@@ -118,7 +121,11 @@ export function UserMenu() {
     setOpen(false);
   }
 
-  const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
+  const short = shortAddress(address);
+  // The button shows the most-prominent identity at a glance: profile name if
+  // they've registered one, else ENS, else the truncated 0x. The popover row
+  // below shows the next layer of detail (ensName + short, or just short).
+  const subtitle = ensName && profile?.name ? ensName : short;
 
   return (
     <div ref={ref} className="relative">
@@ -143,7 +150,7 @@ export function UserMenu() {
             className="font-mono text-muted"
             style={{ fontSize: 10, letterSpacing: 0.3 }}
           >
-            {short}
+            {subtitle}
           </span>
         </span>
         <span
@@ -191,7 +198,7 @@ export function UserMenu() {
 
           <div className="px-4 pt-3 pb-3">
             <div className="ds-eyebrow mb-1.5 flex items-center justify-between">
-              <span>Wallet</span>
+              <span>Wallet{ensName ? ` · ${ensName}` : ""}</span>
               <span className="text-muted" style={{ letterSpacing: 1 }}>
                 {activeChain.name}
               </span>
@@ -238,7 +245,10 @@ export function UserMenu() {
             <MenuLink href="/contracts" onClick={() => setOpen(false)}>
               My contracts
             </MenuLink>
-            <MenuLink href={`/b/${address}`} onClick={() => setOpen(false)}>
+            <MenuLink
+              href={`/b/${ensName ? encodeURIComponent(ensName) : address}`}
+              onClick={() => setOpen(false)}
+            >
               My reputation
             </MenuLink>
             <MenuLink

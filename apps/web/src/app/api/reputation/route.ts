@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sql, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contracts, userProfiles } from "@/server/db/schema";
+import { reverseResolveMany } from "@/lib/ens";
 
 const ACTIVE_STATES = [
   "Active",
@@ -73,23 +74,27 @@ export async function GET() {
     .sort((a, b) => b.lastSeen - a.lastSeen)
     .slice(0, 12);
 
-  const names = wallets.length
-    ? await db
-        .select({ wallet: userProfiles.wallet, name: userProfiles.name })
-        .from(userProfiles)
-        .where(
-          inArray(
-            userProfiles.wallet,
-            wallets.map((w) => w.wallet),
-          ),
-        )
-    : [];
+  const [names, ensNames] = await Promise.all([
+    wallets.length
+      ? db
+          .select({ wallet: userProfiles.wallet, name: userProfiles.name })
+          .from(userProfiles)
+          .where(
+            inArray(
+              userProfiles.wallet,
+              wallets.map((w) => w.wallet),
+            ),
+          )
+      : Promise.resolve([]),
+    reverseResolveMany(wallets.map((w) => w.wallet as `0x${string}`)),
+  ]);
   const nameByWallet = new Map(names.map((n) => [n.wallet, n.name]));
 
   return NextResponse.json({
-    wallets: wallets.map((w) => ({
+    wallets: wallets.map((w, i) => ({
       wallet: w.wallet,
       displayName: nameByWallet.get(w.wallet) ?? null,
+      ensName: ensNames[i] ?? null,
       lastSeen: w.lastSeen,
       contractCount: w.contractCount,
     })),

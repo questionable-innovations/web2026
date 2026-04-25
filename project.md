@@ -47,13 +47,15 @@ DocuSign for web3: a PDF signing flow where signing *is* paying a deposit into a
 
 ### 3.4 Deadlock: "if they don't agree, the money sits there"
 
-- **Position (per brief):** deadlock is the *feature*, not the bug. Money stuck in the middle removes either party's incentive to stonewall — neither gets it until they agree. This mirrors how commercial retention clauses work.
+- **Position:** deadlock is the *feature*, not the bug. Money stuck in the middle removes either party's incentive to stonewall — neither gets it until they agree. This mirrors how commercial retention clauses work.
+- **Where disputes get resolved: in the traditional legal system, not on-chain.** DealSeal is not an arbitration platform and will never adjudicate. The smart contract's job is to *keep the funds safe and produce admissible evidence*, full stop. If the parties disagree, they take their lawyers, the signed PDF, the audit certificate, and the on-chain history to mediation, the Disputes Tribunal, or the District Court — same as any other commercial dispute. The contract just refuses to release until both sides sign off (or a long-horizon `rescue()` path triggers).
+- This framing keeps us out of the regulatory perimeter for arbitration/financial intermediation (§11.2) and out of the technical/social rabbit hole of building a fair on-chain jury.
 - Still a real edge case worth hardening later. Known failure modes to keep noting:
-  - One party genuinely disappears (death, business collapse, lost keys). Need a long-horizon escape hatch.
-  - Partial performance — work was 80% done, what's fair?
-  - Extortion in reverse (payee threatens reputational damage to force release).
-- **For v1:** implement the deadlock faithfully, but expose a `flagDispute()` that records the disagreement on-chain (visible in reputation). Social pressure + reputation cost is the pressure valve.
-- **Post-hackathon roadmap:** optional arbitration module (pre-agreed arbitrator address, or Kleros-style jury), milestone splits, and a very-long timeout (e.g. 2 years) for the "disappeared counterparty" case.
+  - One party genuinely disappears (death, business collapse, lost keys). Need a long-horizon escape hatch — this is what `rescue()` (§4.2) addresses, *not* dispute resolution.
+  - Partial performance — work was 80% done, what's fair? Off-chain negotiation, then court. Not our problem to model.
+  - Extortion in reverse (payee threatens reputational damage to force release). Reputation visibility is a feature; abuse via reputation is also resolvable through defamation / FTA channels.
+- **For v1:** expose a `flagDispute()` that freezes the deal and records the disagreement on-chain (visible in reputation). Surface the audit certificate + signed PDF as a downloadable "evidence pack" so users can hand them straight to counsel.
+- **Explicitly NOT on the roadmap:** crypto-native arbitration modules (Kleros-style juries, pre-agreed arbitrator addresses). Those add legal/technical complexity to solve a problem the existing legal system already solves. Milestone splits and the long-horizon `rescue()` timeout *are* on the roadmap; arbitration is not.
 
 ### 3.5 Wallet UX
 
@@ -139,8 +141,8 @@ DocuSign for web3: a PDF signing flow where signing *is* paying a deposit into a
 3. **Share link** = `https://dealseal.nz/c/<escrow>#<secret>`. Anyone with the link can *view*; `countersign` requires presenting the secret (preimage of the stored hash). Landing page displays the addressed-to email masked (e.g. `b…@example.com`) so the recipient can self-verify they're the intended party.
 4. **Party B countersigns.** B lands on page — *before* any wallet prompt, page shows PDF preview, Party A's name, deposit amount in NZD, and a 3-step progress (Review → Sign & Pay → Done). B signs in (Privy/Dynamic or existing wallet), verifies their own email via OTP *for the audit certificate* (not for access), views PDF, draws signature, confirms amount (typed-amount confirmation for deposits >$1,000 NZD). **One tx** via multicall: `countersign(secret, attestation)` + `safeTransferFrom` of dNZD into escrow, atomic. This atomicity is the product.
 5. **Receipt.** Explicit copy: "Your $X NZD is held in escrow, not paid to Acme yet. Funds release only when both parties approve." Counters the DocuSign "signing is free" mental model.
-6. **Release.** Asymmetric default: payee (A) calls `proposeRelease` at contract end-date; payer (B) approves via a one-tap deep link in email. Nudges at +3 / +7 / +14 days if either side hasn't acted. On mutual approval → funds move.
-7. **Audit certificate.** On release, DealSeal generates a signed PDF certificate (copy DocuSign's format): signer identities, timestamps, IPs, user-agents, EIP-712 payload, PDF hash, tx hashes. Required for CCLA s.229 record-keeping and defensible in a NZ dispute.
+6. **Release.** Either party may call `proposeRelease` once the deal is `Active`; the contract enforces that the *other* party must call `approveRelease` (the proposer can't self-approve). The default UX nudges the payee (A) to propose at contract end-date, and the system emails the counterparty a one-tap deep link back to `/c/<escrow>/release`. Nudges at +3 / +7 / +14 days if either side hasn't acted (still on the build list — see §7 should-have). On mutual approval → state flips to `Released`; payee then calls `withdraw()` (pull-payment) which transitions to `Closed` and moves funds.
+7. **Audit certificate.** On release, DealSeal generates a signed PDF certificate (copy DocuSign's format): signer identities, timestamps, IPs, user-agents, EIP-712 payload, PDF hash, tx hashes. Required for CCLA s.229 record-keeping and defensible in a NZ dispute. *Implemented:* `GET /api/contracts/<addr>/certificate` builds the cert on demand from on-chain state + off-chain attestations and serves it as a PDF; `POST` to the same route pins the cert to IPFS (idempotent, only pins once `Released`/`Closed`). The release page auto-triggers the pin on terminal state.
 
 ### 4.4 Off-chain DB (SQLite is fine for hackathon)
 
@@ -167,7 +169,7 @@ Purely an **index + UX cache**. Nothing authoritative:
 
 - **In-flow fiat on-ramp.** Party B pays by card → Transak/Onramper mints dNZD → deposit happens in the same flow. Removes the "counterparty has no dNZD" dead end. Worth doing early-post-hackathon; too much moving-part risk for the demo itself.
 - **Commit-reveal countersign.** Eliminates the mempool front-run risk on the URL secret. Two-tx UX; only worth it if the exotic attack actually shows up.
-- **Arbitration module.** Pre-agreed arbitrator address or Kleros-style jury. Addresses the "genuine deadlock" edge case.
+- ~~**Arbitration module.**~~ Removed — disputes are resolved off-chain via the traditional legal system (§3.4). The smart contract holds funds and produces evidence; it does not adjudicate.
 - **Milestone splits.** Break the deposit into milestones, each released independently.
 - **Yield on escrow.** Route idle deposits into Aave/Benqi on Avalanche, split yield between parties at release. Adds smart-contract risk and complicates refunds.
 - **Verifiable credentials for identity.** Integrate with a DID method (did:ethr, did:pkh) so reputation is portable across platforms.
@@ -230,7 +232,7 @@ Purely an **index + UX cache**. Nothing authoritative:
 3. ~~**Name:**~~ Decided: **DealSeal**.
 4. ~~**ENS on Avalanche:**~~ On hold — see §10.
 5. ~~**Counterparty gating:**~~ Decided: **URL-secret capability model** (§4.2).
-6. **Dispute fallback:** deadlock-by-design for v1; long-horizon escape hatch and optional arbitration module on the roadmap.
+6. ~~**Dispute fallback:**~~ Decided: deadlock-by-design; disputes resolved off-chain via traditional legal channels (§3.4). On-chain `flagDispute()` freezes funds and records the disagreement; the audit certificate + signed PDF are the artifacts you take to your lawyer. No arbitration module — ever.
 7. **Chain:** Fuji testnet for demo (design contracts to be L1-portable). Confirm.
 8. **Team size + deadline:** how many people, how many days until the hackathon? Governs what's realistic from §7.
 9. **dNZD on Avalanche status:** does New Money have a native C-chain deployment? If not, commit to USDC for the demo and keep dNZD as the roadmap story. Need to email New Money this week.

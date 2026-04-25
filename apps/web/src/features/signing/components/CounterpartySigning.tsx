@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { readSecretFromHash } from "@/lib/share-link";
 import { BrandMark, PdfThumb, Seal } from "@/components/AppShell";
 import { SignAndPay } from "./SignAndDeposit";
-import { depositToken } from "@/lib/chain";
+import { getDepositTokenByAddress } from "@/lib/chain";
 
 type ContractInfo = {
   escrowAddress: `0x${string}`;
@@ -119,6 +119,8 @@ function BLanding({
   info: ContractInfo;
   onContinue: () => void;
 }) {
+  const selectedToken = getDepositTokenByAddress(info.depositToken);
+
   return (
     <div className="min-h-screen bg-paper px-16 py-7">
       <div className="mb-5 flex items-center justify-between">
@@ -200,7 +202,7 @@ function BLanding({
                     ${Number(info.totalDue).toLocaleString()}
                     <span className="text-muted" style={{ fontSize: 14 }}>
                       {" "}
-                      {depositToken.symbol}
+                      {selectedToken.symbol}
                     </span>
                   </div>
                 </div>
@@ -219,7 +221,7 @@ function BLanding({
                   ${Number(info.depositAmount).toLocaleString()}
                   <span className="text-muted" style={{ fontSize: 14 }}>
                     {" "}
-                    {depositToken.symbol}
+                    {selectedToken.symbol}
                   </span>
                 </div>
               </div>
@@ -338,6 +340,8 @@ function BSignPay({
 }
 
 function BReceipt({ info }: { info: ContractInfo }) {
+  const selectedToken = getDepositTokenByAddress(info.depositToken);
+
   return (
     <div className="min-h-screen bg-paper px-16 py-8">
       <div className="mb-6 flex items-center justify-between">
@@ -424,13 +428,13 @@ function BReceipt({ info }: { info: ContractInfo }) {
             />
             <ReceiptRow
               k="amount"
-              v={`${info.depositAmount} ${depositToken.symbol}`}
+              v={`${info.depositAmount} ${selectedToken.symbol}`}
               accent
             />
             {info.totalDue && (
               <ReceiptRow
                 k="totalDue"
-                v={`${info.totalDue} ${depositToken.symbol}`}
+                v={`${info.totalDue} ${selectedToken.symbol}`}
               />
             )}
             <ReceiptRow k="release" v="requires both ✓" />

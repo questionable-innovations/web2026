@@ -32,6 +32,7 @@ export type OnchainEscrow = {
   partyA: `0x${string}`;
   partyB: `0x${string}`;
   pdfHash: `0x${string}`;
+  token: `0x${string}`;
   amount: bigint;
   factory: `0x${string}`;
 };
@@ -47,7 +48,7 @@ export async function readEscrow(
   const code = await serverPublicClient.getCode({ address });
   if (!code || code === "0x") return null;
 
-  const [stateNum, partyA, partyB, pdfHash, amount, factory] =
+  const [stateNum, partyA, partyB, pdfHash, token, amount, factory] =
     await Promise.all([
       serverPublicClient.readContract({
         address,
@@ -68,6 +69,11 @@ export async function readEscrow(
         address,
         abi: escrowAbi,
         functionName: "pdfHash",
+      }) as Promise<`0x${string}`>,
+      serverPublicClient.readContract({
+        address,
+        abi: escrowAbi,
+        functionName: "token",
       }) as Promise<`0x${string}`>,
       serverPublicClient.readContract({
         address,
@@ -104,6 +110,7 @@ export async function readEscrow(
     partyA,
     partyB,
     pdfHash,
+    token,
     amount,
     factory,
   };

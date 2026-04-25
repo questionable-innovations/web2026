@@ -16,7 +16,13 @@ import {
   eip712Types,
   newSalt,
 } from "@/lib/attestation";
-import { activeChain, depositToken, escrowFactoryAddress } from "@/lib/chain";
+import {
+  activeChain,
+  depositToken,
+  depositTokens,
+  escrowFactoryAddress,
+  type DepositTokenConfig,
+} from "@/lib/chain";
 import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { PdfViewer } from "./PdfViewer";
@@ -48,6 +54,7 @@ type Details = {
   counterpartyEmail: string;
   amount: string;
   totalDue: string;
+  depositToken: DepositTokenConfig;
   dealDeadline: number;
 };
 
@@ -278,6 +285,9 @@ function DetailsStep({
   );
   const [amount, setAmount] = useState(initial?.amount ?? "");
   const [totalDue, setTotalDue] = useState(initial?.totalDue ?? "");
+  const [depositTokenId, setDepositTokenId] = useState(
+    initial?.depositToken.id ?? depositToken.id,
+  );
   const [days, setDays] = useState(() => {
     if (!initial) return "";
     const remaining = Math.round(
@@ -321,6 +331,9 @@ function DetailsStep({
     }
   };
 
+  const selectedToken =
+    depositTokens.find((token) => token.id === depositTokenId) ?? depositToken;
+
   const deadlineLabel = useMemo(() => {
     const d = new Date(Date.now() + Number(days || 0) * 86400_000);
     return d.toISOString().slice(0, 10);
@@ -343,6 +356,7 @@ function DetailsStep({
           counterpartyEmail,
           amount,
           totalDue,
+          depositToken: selectedToken,
           dealDeadline: Math.floor(Date.now() / 1000) + dayCount * 86_400,
         });
       }}
@@ -455,7 +469,7 @@ function DetailsStep({
             className="font-mono uppercase text-muted"
             style={{ fontSize: 10, letterSpacing: 1 }}
           >
-            = {totalDue || "0"} {depositToken.symbol}
+            = {totalDue || "0"} {selectedToken.symbol}
           </span>
         </div>
 
@@ -485,7 +499,7 @@ function DetailsStep({
               className="font-mono uppercase text-muted"
               style={{ fontSize: 10, letterSpacing: 1 }}
             >
-              = {amount || "0"} {depositToken.symbol}
+              = {amount || "0"} {selectedToken.symbol}
             </span>
           </div>
           <div>
@@ -502,6 +516,22 @@ function DetailsStep({
               <span className="text-muted">days · {deadlineLabel}</span>
             </div>
           </div>
+        </div>
+
+        <div className="mt-3">
+          <FieldLabel>Paying with</FieldLabel>
+          <select
+            value={depositTokenId}
+            onChange={(e) => setDepositTokenId(e.target.value)}
+            className="w-full border border-rule bg-paper px-3.5 py-3 font-mono outline-none"
+            style={{ fontSize: 12 }}
+          >
+            {depositTokens.map((token) => (
+              <option key={token.id} value={token.id}>
+                {token.label} - {token.helper}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div
@@ -565,7 +595,7 @@ function DetailsStep({
             style={{ fontSize: 11, lineHeight: 1.7 }}
           >
             <div>pdfHash &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; computed on next step</div>
-            <div>token &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {depositToken.symbol}</div>
+            <div>token &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {selectedToken.symbol}</div>
             <div>amount &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {amount || "—"}</div>
             <div>partyA &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; you</div>
             <div>
@@ -749,7 +779,7 @@ function SignStep({
               // Read decimals from chain — env-derived decimals risk an
               // off-by-10^n bug if misconfigured.
               const decimals = (await publicClient.readContract({
-                address: depositToken.address,
+                address: details.depositToken.address,
                 abi: erc20Abi,
                 functionName: "decimals",
               })) as number;
@@ -761,7 +791,7 @@ function SignStep({
                 functionName: "createEscrowDeterministic",
                 args: [
                   salt,
-                  depositToken.address,
+                  details.depositToken.address,
                   amountWei,
                   pdfHash,
                   cid,
@@ -790,6 +820,7 @@ function SignStep({
                   counterpartyEmail: details.counterpartyEmail,
                   counterpartyName: details.counterpartyName,
                   amount: details.amount,
+                  depositToken: details.depositToken.address,
                   pdfHash,
                   pdfCid: cid,
                   escrowAddress: predicted,
@@ -908,8 +939,11 @@ function Summary({
         k="Counterparty"
         v={`${details.counterpartyName} · ${details.counterpartyEmail}`}
       />
-      <Row k="Total Due" v={`${details.totalDue || "0"} ${depositToken.symbol}`} />
-      <Row k="Deposit" v={`${details.amount} ${depositToken.symbol}`} />
+      <Row
+        k="Total Due"
+        v={`${details.totalDue || "0"} ${details.depositToken.symbol}`}
+      />
+      <Row k="Deposit" v={`${details.amount} ${details.depositToken.symbol}`} />
       <Row k="You" v={`${profile.name} · ${profile.email}`} />
       <Row k="Wallet" v={`${wallet.slice(0, 6)}…${wallet.slice(-4)}`} />
     </dl>
@@ -1051,8 +1085,11 @@ function ShareStep({
           <div className="ds-eyebrow mb-2">On-chain</div>
           <div className="font-mono" style={{ fontSize: 11, lineHeight: 1.8 }}>
             <Row k="escrow" v={trimmedAddr} />
-            <Row k="amount" v={`${details.amount} ${depositToken.symbol}`} />
-            <Row k="total due" v={`${details.totalDue || "0"} ${depositToken.symbol}`} />
+            <Row k="amount" v={`${details.amount} ${details.depositToken.symbol}`} />
+            <Row
+              k="total due"
+              v={`${details.totalDue || "0"} ${details.depositToken.symbol}`}
+            />
             <Row
               k="validUntil"
               v={`+${Math.round(

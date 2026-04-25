@@ -14,7 +14,7 @@ import {
   eip712Types,
   newSalt,
 } from "@/lib/attestation";
-import { activeChain, depositToken } from "@/lib/chain";
+import { activeChain, getDepositTokenByAddress } from "@/lib/chain";
 import { erc20Abi, escrowAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { SignaturePad } from "./SignaturePad";
@@ -91,10 +91,14 @@ function Inner({
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [inkDataUrl, setInkDataUrl] = useState<string | null>(null);
+  const selectedToken = useMemo(
+    () => getDepositTokenByAddress(info.depositToken),
+    [info.depositToken],
+  );
 
   const depositLabel = useMemo(
-    () => `${info.depositAmount} ${depositToken.symbol}`,
-    [info.depositAmount],
+    () => `${info.depositAmount} ${selectedToken.symbol}`,
+    [info.depositAmount, selectedToken.symbol],
   );
 
   const { data: onchainAmount } = useReadContract({
@@ -122,7 +126,9 @@ function Inner({
     functionName: "decimals",
   });
   const decimals =
-    typeof onchainDecimals === "number" ? onchainDecimals : depositToken.decimals;
+    typeof onchainDecimals === "number"
+      ? onchainDecimals
+      : selectedToken.decimals;
 
   const insufficient =
     onchainAmount !== undefined &&
@@ -272,7 +278,7 @@ function Inner({
             <span>
               balance:{" "}
               {formatUnits(balance as bigint, decimals)}{" "}
-              {depositToken.symbol}
+              {selectedToken.symbol}
             </span>
           )}
         </div>
@@ -375,7 +381,7 @@ function Inner({
           />
           <KV
             k="amount"
-            v={`${info.depositAmount} ${depositToken.symbol}`}
+            v={`${info.depositAmount} ${selectedToken.symbol}`}
             accent
           />
           <KV k="nameHash" v="0xa3…(salted)" />
@@ -387,7 +393,8 @@ function Inner({
         <FundWalletPanel
           wallet={wallet}
           needed={onchainAmount as bigint}
-          symbol={depositToken.symbol}
+          tokenAddress={info.depositToken}
+          symbol={selectedToken.symbol}
           decimals={decimals}
           refetchBalance={refetchBalance}
         />

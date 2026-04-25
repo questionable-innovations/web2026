@@ -12,7 +12,8 @@
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test",
     "contracts:fmt": "cd contracts && forge fmt",
-    "contracts:deploy:fuji": "bash contracts/script/deploy-fuji.sh"
+    "contracts:deploy:fuji": "bash contracts/script/deploy-fuji.sh",
+    "contracts:deploy:fuji:win": "powershell -ExecutionPolicy Bypass -File contracts/script/deploy-fuji.ps1"
   },
   "engines": {
     "node": ">=22 <24"

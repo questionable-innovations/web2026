@@ -122,7 +122,7 @@ export function WalletGate({
               className="mt-4 font-mono text-accent"
               style={{ fontSize: 11, letterSpacing: 0.04 }}
             >
-              {error.message}
+              An error occurred.
             </p>
           )}
         </div>

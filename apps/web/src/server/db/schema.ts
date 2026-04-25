@@ -12,6 +12,7 @@ export const contracts = sqliteTable("contracts", {
   partyBWallet: text("party_b_wallet"),
   depositToken: text("deposit_token").notNull(),
   depositAmount: text("deposit_amount").notNull(),
+  totalDue: text("total_due"),
   fieldsJson: text("fields_json").notNull().default("[]"),
   state: text("state").notNull().default("Draft"),
   createdAt: integer("created_at", { mode: "timestamp" })

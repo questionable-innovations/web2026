@@ -47,6 +47,7 @@ type Details = {
   counterpartyName: string;
   counterpartyEmail: string;
   amount: string;
+  totalDue: string;
   dealDeadline: number;
 };
 
@@ -276,6 +277,7 @@ function DetailsStep({
     initial?.counterpartyEmail ?? "",
   );
   const [amount, setAmount] = useState(initial?.amount ?? "");
+  const [totalDue, setTotalDue] = useState(initial?.totalDue ?? "");
   const [days, setDays] = useState(() => {
     if (!initial) return "30";
     const remaining = Math.round(
@@ -304,6 +306,7 @@ function DetailsStep({
         if (data.counterpartyName) setCounterpartyName(data.counterpartyName);
         if (data.counterpartyEmail) setCounterpartyEmail(data.counterpartyEmail);
         if (data.amount) setAmount(String(data.amount));
+        if (data.totalDue) setTotalDue(String(data.totalDue));
       } else {
         const errText = await res.text();
         alert(`API Error: ${errText}`);
@@ -338,6 +341,7 @@ function DetailsStep({
           counterpartyName,
           counterpartyEmail,
           amount,
+          totalDue,
           dealDeadline: Math.floor(Date.now() / 1000) + dayCount * 86_400,
         });
       }}
@@ -427,6 +431,31 @@ function DetailsStep({
               className="ds-input"
             />
           </div>
+        </div>
+
+        <div style={{ height: 22 }} />
+        <div className="ds-eyebrow mb-2">Total Due</div>
+        <div
+          className="flex items-baseline gap-2 bg-paper px-4 py-3.5"
+          style={{ border: "1px solid var(--color-rule)" }}
+        >
+          <span className="font-mono text-muted" style={{ fontSize: 12 }}>
+            NZD
+          </span>
+          <input
+            inputMode="decimal"
+            value={totalDue}
+            onChange={(e) => setTotalDue(e.target.value)}
+            placeholder="10,000.00"
+            className="flex-1 bg-transparent font-serif outline-none"
+            style={{ fontSize: 32, lineHeight: 1 }}
+          />
+          <span
+            className="font-mono uppercase text-muted"
+            style={{ fontSize: 10, letterSpacing: 1 }}
+          >
+            = {totalDue || "0"} {depositToken.symbol}
+          </span>
         </div>
 
         <div style={{ height: 22 }} />
@@ -878,6 +907,7 @@ function Summary({
         k="Counterparty"
         v={`${details.counterpartyName} · ${details.counterpartyEmail}`}
       />
+      <Row k="Total Due" v={`${details.totalDue || "0"} ${depositToken.symbol}`} />
       <Row k="Deposit" v={`${details.amount} ${depositToken.symbol}`} />
       <Row k="You" v={`${profile.name} · ${profile.email}`} />
       <Row k="Wallet" v={`${wallet.slice(0, 6)}…${wallet.slice(-4)}`} />
@@ -1021,6 +1051,7 @@ function ShareStep({
           <div className="font-mono" style={{ fontSize: 11, lineHeight: 1.8 }}>
             <Row k="escrow" v={trimmedAddr} />
             <Row k="amount" v={`${details.amount} ${depositToken.symbol}`} />
+            <Row k="total due" v={`${details.totalDue || "0"} ${depositToken.symbol}`} />
             <Row
               k="validUntil"
               v={`+${Math.round(

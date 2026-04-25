@@ -21,6 +21,7 @@
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "pinata": "^1.5.0",
+    "prettier": "^3.8.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-pdf": "^9.1.1",

@@ -26,15 +26,38 @@ export async function POST(req: Request) {
     });
 
   const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM ?? "noreply@example.com";
+  console.log(
+    `[otp] request email=${parsed.data.email} from=${from} hasApiKey=${!!apiKey} apiKeyLen=${apiKey?.length ?? 0}`,
+  );
+
   if (apiKey) {
     const resend = new Resend(apiKey);
 
-    await resend.emails.send({
-      from: process.env.EMAIL_FROM ?? "noreply@example.com",
-      to: parsed.data.email,
-      subject: "Your one time code",
-      react: EmailTemplate({ code }),
-    });
+    try {
+      const result = await resend.emails.send({
+        from,
+        to: parsed.data.email,
+        subject: "Your one time code",
+        react: EmailTemplate({ code }),
+      });
+      console.log(`[otp] resend response`, JSON.stringify(result));
+      if (result.error) {
+        return NextResponse.json(
+          { error: "send failed", detail: result.error },
+          { status: 502 },
+        );
+      }
+    } catch (err) {
+      console.error(`[otp] resend threw`, err);
+      return NextResponse.json(
+        {
+          error: "send threw",
+          detail: err instanceof Error ? err.message : String(err),
+        },
+        { status: 502 },
+      );
+    }
   } else {
     console.log(`[dev] OTP for ${parsed.data.email}: ${code}`);
   }

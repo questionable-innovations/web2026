@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAccount,
   usePublicClient,
@@ -553,6 +553,46 @@ function SignStep({
   const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useWriteContract();
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [stampedFile, setStampedFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    let canceled = false;
+    async function stampPreview() {
+      if (!details.file) return;
+      try {
+        const buf = await details.file.arrayBuffer();
+        
+        let stampedBytes: Uint8Array | null = null;
+        
+        // Always generate the timestamp page in "sign" preview with the live signature
+        stampedBytes = await appendSignatureCertificate(buf, [
+          {
+            role: "Party A",
+            name: profile.name,
+            email: profile.email,
+            wallet,
+            attestationHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+            signedAtUnix: Math.floor(Date.now() / 1000),
+            // Pass the current signature pad data, or a blank "placeholder" if none yet
+            signaturePngDataUrl: signatureDataUrl || "",
+          },
+        ]);
+
+        if (!canceled && stampedBytes) {
+          const blob = new Blob([stampedBytes as BlobPart], { type: "application/pdf" });
+          const newFile = new File([blob], details.file.name.replace(".pdf", "-stamped.pdf"), { type: "application/pdf" });
+          setStampedFile(newFile);
+        }
+      } catch (err) {
+        console.error("Preview stamp error", err);
+      }
+    }
+    stampPreview();
+    return () => {
+      canceled = true;
+    };
+  }, [details.file, signatureDataUrl, profile.name, profile.email, wallet]);
+
   const factoryReady = useMemo(
     () =>
       escrowFactoryAddress !== "0x0000000000000000000000000000000000000000",
@@ -562,7 +602,7 @@ function SignStep({
   return (
     <div className="grid gap-6" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
       <div className="border border-rule bg-card p-3">
-        <PdfViewer file={details.file} />
+        <PdfViewer file={stampedFile || details.file} />
       </div>
       <div className="space-y-4">
         <div className="border border-rule bg-card p-6">

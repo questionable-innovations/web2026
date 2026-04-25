@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
 import type { Connector } from "wagmi";
 import { usePrivy } from "@privy-io/react-auth";
 
@@ -383,45 +383,6 @@ function resolveIcon(c: Connector): string | null {
 
 function pad2(n: number): string {
   return n.toString().padStart(2, "0");
-}
-
-/// Shared wallet badge for app shells. Connected → short addr + disconnect;
-/// disconnected → "Sign in" link to the new flow that requires sign-in
-/// anyway.
-export function WalletBadge() {
-  const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
-  const privy = useSafePrivy();
-
-  if (!isConnected || !address) {
-    return (
-      <a
-        href="/new"
-        className="bg-ink px-4 py-2.5 text-[13px] text-paper"
-        style={{ letterSpacing: 0.3 }}
-      >
-        Sign in →
-      </a>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="font-mono text-[11px] text-muted">
-        {address.slice(0, 6)}…{address.slice(-4)}
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          if (privy?.authenticated) privy.logout();
-          disconnect();
-        }}
-        className="font-mono text-[10px] text-accent"
-        style={{ letterSpacing: 1 }}
-      >
-        SIGN OUT
-      </button>
-    </div>
-  );
 }
 
 /// Privy throws if its provider isn't mounted. We render with bare wagmi

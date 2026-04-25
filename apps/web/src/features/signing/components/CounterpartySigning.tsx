@@ -281,28 +281,22 @@ function BSignPay({
 }) {
   return (
     <div className="min-h-screen bg-ink text-paper">
-      <div
-        className="flex items-center justify-between border-b px-8 py-5"
-        style={{ borderColor: "rgba(255,255,255,0.08)" }}
-      >
+      <div className="flex items-center justify-between border-b border-ink-rule-soft px-8 py-5">
         <span
-          className="font-serif"
-          style={{ fontSize: 22, letterSpacing: -0.4, color: "var(--color-paper)" }}
+          className="font-serif text-paper"
+          style={{ fontSize: 22, letterSpacing: -0.4 }}
         >
           DealSeal
         </span>
         <div
-          className="flex gap-6 font-mono"
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}
+          className="flex gap-6 font-mono text-ink-muted"
+          style={{ fontSize: 11 }}
         >
-          <span style={{ color: "rgba(255,255,255,0.25)" }}>① REVIEW ✓</span>
-          <span style={{ color: "rgba(255,255,255,0.9)" }}>② SIGN &amp; PAY</span>
-          <span style={{ color: "rgba(255,255,255,0.25)" }}>③ DONE</span>
+          <span className="text-ink-faint">① REVIEW ✓</span>
+          <span className="text-paper">② SIGN &amp; PAY</span>
+          <span className="text-ink-faint">③ DONE</span>
         </div>
-        <span
-          className="font-mono"
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}
-        >
+        <span className="font-mono text-ink-muted" style={{ fontSize: 11 }}>
           escrow {info.escrowAddress.slice(0, 6)}…{info.escrowAddress.slice(-4)}
         </span>
       </div>
@@ -328,8 +322,8 @@ function BSignPay({
               <em className="text-accent not-italic">and</em> place the deposit.
             </h1>
             <p
-              className="max-w-md leading-relaxed"
-              style={{ fontSize: 15, color: "rgba(255,255,255,0.85)" }}
+              className="max-w-md leading-relaxed text-ink-soft"
+              style={{ fontSize: 15 }}
             >
               Both halves commit atomically. If the deposit fails, the
               signature reverts. There is no in-between state.

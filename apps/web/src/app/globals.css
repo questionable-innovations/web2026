@@ -15,6 +15,14 @@
   --color-amber: #a07300;
   --color-amber-soft: rgba(231, 181, 54, 0.08);
 
+  /* dark-surface palette — counterparts to paper/card/muted/rule for content on bg-ink */
+  --color-ink-card: rgba(255, 255, 255, 0.04);
+  --color-ink-rule: rgba(255, 255, 255, 0.14);
+  --color-ink-rule-soft: rgba(255, 255, 255, 0.08);
+  --color-ink-faint: rgba(255, 255, 255, 0.25);
+  --color-ink-muted: rgba(255, 255, 255, 0.6);
+  --color-ink-soft: rgba(255, 255, 255, 0.82);
+
   /* legacy aliases retained for components not yet restyled */
   --color-bg: #f5f3ee;
   --color-surface: #ffffff;

@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  CornerDownRight,
+  Flag,
+} from "lucide-react";
+import {
   useAccount,
   usePublicClient,
   useWriteContract,
@@ -515,7 +523,8 @@ function Inner({
                     color: "rgba(255,255,255,0.7)",
                   }}
                 >
-                  → {status.partyA.wallet.slice(0, 6)}…
+                  <ArrowRight size={11} className="inline-block mr-1 align-text-bottom" />
+                  {status.partyA.wallet.slice(0, 6)}…
                   {status.partyA.wallet.slice(-4)} (Party A)
                 </div>
               </div>
@@ -539,7 +548,10 @@ function Inner({
                       className="text-accent"
                       style={{ fontSize: 12 }}
                     >
-                      Download PDF →
+                      <span className="inline-flex items-center gap-1.5">
+                        Download PDF
+                        <ArrowRight size={12} />
+                      </span>
                     </a>
                     {pinnedCid && (
                       <div
@@ -569,7 +581,8 @@ function Inner({
             className="mt-4 font-mono text-muted"
             style={{ fontSize: 11, lineHeight: 1.6 }}
           >
-            ↳ Connected as {account.address?.slice(0, 6)}…
+            <CornerDownRight size={11} className="inline-block mr-1 align-text-bottom" />
+            Connected as {account.address?.slice(0, 6)}…
             {account.address?.slice(-4)} · role {abbreviateRole(role)}.
           </div>
         </div>

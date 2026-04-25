@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { ArrowRight } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
 import type { Connector } from "wagmi";
 import { usePrivy } from "@privy-io/react-auth";
@@ -12,7 +13,7 @@ import { usePrivy } from "@privy-io/react-auth";
 export function WalletGate({
   children,
   title = "Sign in to seal a deal",
-  blurb = "DealSeal is wallet-first. Your wallet is your identity, your signature, and the source of your reputation. Pick one method below — every option leads to the same desk.",
+  blurb = "DealSeal is wallet-first. Your wallet is your identity, your signature, and the source of your reputation. Pick one method below; every option leads to the same desk.",
 }: {
   children: (address: `0x${string}`) => ReactNode;
   title?: string;
@@ -149,7 +150,7 @@ export function WalletGate({
                 §2
               </span>
               <span>
-                Reputation accrues to your wallet — visible, portable, never
+                Reputation accrues to your wallet: visible, portable, never
                 tied to LinkedIn.
               </span>
             </li>
@@ -283,11 +284,10 @@ function MethodRow({
             {method.isPending ? "…" : method.kind === "embedded" ? "CONTINUE" : "CONNECT"}
           </span>
           <span
-            className="font-mono text-accent transition-transform duration-200 ease-out group-hover:translate-x-2"
-            style={{ fontSize: 13 }}
+            className="text-accent transition-transform duration-200 ease-out group-hover:translate-x-2"
             aria-hidden
           >
-            →
+            <ArrowRight size={14} />
           </span>
         </span>
       </button>

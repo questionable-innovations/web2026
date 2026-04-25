@@ -8,12 +8,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminPage() {
-  // Fetch active contracts (which means they're deployed)
-  // For demo, we just fetch all contracts that are not just "Draft"
+  // Funds are in Aave (and accruing) until withdraw() lands and state
+  // becomes Closed. Released still holds the deposit, so include it —
+  // otherwise the interest readout drops to zero the moment both parties
+  // approve, even though the money is still in the pool.
   const activeContracts = await db
     .select()
     .from(contracts)
-    .where(inArray(contracts.state, ["Active", "Releasing", "Disputed"]))
+    .where(inArray(contracts.state, ["Active", "Releasing", "Released", "Disputed"]))
     .orderBy(desc(contracts.createdAt));
 
   return (

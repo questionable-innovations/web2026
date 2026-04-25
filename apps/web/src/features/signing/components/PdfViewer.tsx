@@ -61,14 +61,14 @@ export function PdfViewer(props: Props) {
           setPages(numPages);
           
           // Pages render asynchronously after LoadSuccess. 
-          // Repeatedly try to restore the scroll over ~500ms so it catches them as they pop in
+          // Repeatedly try to restore the scroll over ~1.5s so it catches them as they pop in
           let frameCount = 0;
           const restoreScroll = () => {
             if (scrollContainerRef.current) {
               scrollContainerRef.current.scrollTop = scrollPosRef.current;
             }
             frameCount++;
-            if (frameCount < 30) {
+            if (frameCount < 90) {
               requestAnimationFrame(restoreScroll);
             } else {
               isRestoringRef.current = false;
@@ -78,7 +78,17 @@ export function PdfViewer(props: Props) {
         }}
       >
         {Array.from({ length: pages }, (_, i) => (
-          <Page key={i + 1} pageNumber={i + 1} width={680} loading={null} />
+          <Page 
+            key={i + 1} 
+            pageNumber={i + 1} 
+            width={680} 
+            loading={null}
+            onRenderSuccess={() => {
+              if (scrollContainerRef.current && isRestoringRef.current) {
+                scrollContainerRef.current.scrollTop = scrollPosRef.current;
+              }
+            }}
+          />
         ))}
       </Document>
     </div>

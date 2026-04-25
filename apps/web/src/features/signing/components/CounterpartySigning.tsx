@@ -15,6 +15,7 @@ type ContractInfo = {
   counterpartyEmailMasked: string | null;
   counterpartyName: string | null;
   depositAmount: string;
+  totalDue: string | null;
   depositToken: `0x${string}`;
   dealDeadline: number | null;
   state: string;
@@ -184,6 +185,26 @@ function BLanding({
             />
 
             <div className="grid grid-cols-2 gap-3">
+              {info.totalDue && (
+                <div>
+                  <div
+                    className="font-mono uppercase text-muted"
+                    style={{ fontSize: 10, letterSpacing: 1 }}
+                  >
+                    Total due
+                  </div>
+                  <div
+                    className="mt-1 font-serif"
+                    style={{ fontSize: 36, lineHeight: 1 }}
+                  >
+                    ${Number(info.totalDue).toLocaleString()}
+                    <span className="text-muted" style={{ fontSize: 14 }}>
+                      {" "}
+                      {depositToken.symbol}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div>
                 <div
                   className="font-mono uppercase text-muted"
@@ -412,6 +433,12 @@ function BReceipt({ info }: { info: ContractInfo }) {
               v={`${info.depositAmount} ${depositToken.symbol}`}
               accent
             />
+            {info.totalDue && (
+              <ReceiptRow
+                k="totalDue"
+                v={`${info.totalDue} ${depositToken.symbol}`}
+              />
+            )}
             <ReceiptRow k="release" v="requires both ✓" />
           </div>
           <a

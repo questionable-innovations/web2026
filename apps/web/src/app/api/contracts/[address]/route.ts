@@ -46,6 +46,7 @@ export async function GET(
     counterpartyName: (fields.counterpartyName as string) ?? null,
     depositToken: row.depositToken,
     depositAmount: row.depositAmount,
+    totalDue: row.totalDue,
     dealDeadline: (fields.dealDeadline as number) ?? null,
     state: row.state,
     createdAt: row.createdAt,

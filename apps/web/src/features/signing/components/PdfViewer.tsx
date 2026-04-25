@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -14,9 +14,14 @@ type Props =
 export function PdfViewer(props: Props) {
   const [url, setUrl] = useState<string>();
   const [pages, setPages] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollPosRef = useRef(0);
+  const isRestoringRef = useRef(false);
 
   useEffect(() => {
     let revoke: string | undefined;
+    isRestoringRef.current = true; // Suspend saving scroll position while fetching/reloading
+    
     if (props.file) {
       const blobUrl = URL.createObjectURL(props.file);
       revoke = blobUrl;
@@ -40,10 +45,50 @@ export function PdfViewer(props: Props) {
     return <p className="text-sm text-zinc-500">Loading PDF…</p>;
   }
   return (
-    <div className="max-h-[640px] overflow-auto">
-      <Document file={url} onLoadSuccess={({ numPages }) => setPages(numPages)}>
+    <div
+      ref={scrollContainerRef}
+      className="max-h-[640px] overflow-auto relative bg-card"
+      onScroll={(e) => {
+        if (!isRestoringRef.current) {
+          scrollPosRef.current = e.currentTarget.scrollTop;
+        }
+      }}
+    >
+      <Document
+        file={url}
+        loading={null} // Prevent layout collapse to minimize scroll-jump
+        onLoadSuccess={({ numPages }) => {
+          setPages(numPages);
+          
+          // Pages render asynchronously after LoadSuccess. 
+          // Repeatedly try to restore the scroll over ~1.5s so it catches them as they pop in
+          let frameCount = 0;
+          const restoreScroll = () => {
+            if (scrollContainerRef.current) {
+              scrollContainerRef.current.scrollTop = scrollPosRef.current;
+            }
+            frameCount++;
+            if (frameCount < 90) {
+              requestAnimationFrame(restoreScroll);
+            } else {
+              isRestoringRef.current = false;
+            }
+          };
+          requestAnimationFrame(restoreScroll);
+        }}
+      >
         {Array.from({ length: pages }, (_, i) => (
-          <Page key={i + 1} pageNumber={i + 1} width={680} />
+          <Page 
+            key={i + 1} 
+            pageNumber={i + 1} 
+            width={680} 
+            loading={null}
+            onRenderSuccess={() => {
+              if (scrollContainerRef.current && isRestoringRef.current) {
+                scrollContainerRef.current.scrollTop = scrollPosRef.current;
+              }
+            }}
+          />
         ))}
       </Document>
     </div>

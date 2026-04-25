@@ -291,9 +291,10 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
         const errText = await res.text();
         alert(`API Error: ${errText}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("AI Extraction failed", err);
-      alert(`Network Error: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+      alert(`Network Error: ${errorMessage}`);
     } finally {
       setIsAnalyzing(false);
     }

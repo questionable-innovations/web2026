@@ -12,6 +12,13 @@ import {EIP712Upgradeable} from
 
 interface IEscrowFactory {
     function recordCountersign(address partyB) external;
+    function aavePool() external view returns (address);
+    function platformWallet() external view returns (address);
+}
+
+interface IPool {
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 }
 
 /// @title Escrow — deployed as an EIP-1167 minimal proxy clone, one per agreement.
@@ -177,6 +184,13 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
             revert TransferAmountMismatch();
         }
 
+        // Supply the deposited tokens to Aave Pool
+        address aavePool = IEscrowFactory(factory).aavePool();
+        if (aavePool != address(0)) {
+            token.approve(aavePool, amount);
+            IPool(aavePool).supply(address(token), amount, address(this), 0);
+        }
+
         // Index partyB on the factory so reputation aggregates over both sides.
         // Failure here is non-fatal — the on-chain commitment is what matters,
         // and the factory address is fixed at clone-time so this can only
@@ -209,7 +223,24 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         if (amt == 0) revert NothingToWithdraw();
         withdrawable = 0;
         state = State.Closed;
-        token.safeTransfer(partyA, amt);
+
+        address aavePool = IEscrowFactory(factory).aavePool();
+        if (aavePool != address(0)) {
+            uint256 totalWithdrawn = IPool(aavePool).withdraw(address(token), type(uint256).max, address(this));
+            if (totalWithdrawn > amt) {
+                address platformWallet = IEscrowFactory(factory).platformWallet();
+                if (platformWallet != address(0)) {
+                    token.safeTransfer(platformWallet, totalWithdrawn - amt);
+                }
+            } else {
+                amt = totalWithdrawn;
+            }
+        }
+
+        if (amt > 0) {
+            token.safeTransfer(partyA, amt);
+        }
+
         emit Withdrawn(partyA, amt);
     }
 
@@ -261,7 +292,24 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         if (block.timestamp < uint256(deadline) + RESCUE_TIMEOUT) {
             revert RescueTimeoutNotReached();
         }
-        uint256 bal = token.balanceOf(address(this));
+        
+        address aavePool = IEscrowFactory(factory).aavePool();
+        uint256 bal = amount;
+
+        if (aavePool != address(0)) {
+            uint256 totalWithdrawn = IPool(aavePool).withdraw(address(token), type(uint256).max, address(this));
+            if (totalWithdrawn > bal) {
+                address platformWallet = IEscrowFactory(factory).platformWallet();
+                if (platformWallet != address(0)) {
+                    token.safeTransfer(platformWallet, totalWithdrawn - bal);
+                }
+            } else {
+                bal = totalWithdrawn;
+            }
+        } else {
+            bal = token.balanceOf(address(this));
+        }
+
         if (bal == 0) revert NothingToWithdraw();
 
         // For the v1 demo, send to caller. Full fix (try partyA first, fall

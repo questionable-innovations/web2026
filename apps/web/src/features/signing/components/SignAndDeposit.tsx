@@ -138,8 +138,8 @@ function Inner({
     balance !== undefined &&
     (balance as bigint) < (onchainAmount as bigint);
 
-  const wholeAmount = String(Math.floor(Number(info.depositAmount)));
-  const confirmMatches = confirm === wholeAmount;
+  const exactAmount = String(info.depositAmount);
+  const confirmMatches = confirm === exactAmount;
 
   const ready =
     inkDataUrl !== null &&
@@ -327,10 +327,10 @@ function Inner({
           >
             <span className="text-accent">$</span>
             <input
-              inputMode="numeric"
+              inputMode="decimal"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value.replace(/\D/g, ""))}
-              placeholder={wholeAmount}
+              onChange={(e) => setConfirm(e.target.value.replace(/[^0-9.]/g, ""))}
+              placeholder={exactAmount}
               className="flex-1 bg-transparent text-paper outline-none placeholder:text-ink-faint"
             />
             <span className="inline-flex items-center gap-1 text-ink-muted" style={{ fontSize: 11 }}>
@@ -340,7 +340,7 @@ function Inner({
                   <Check size={12} strokeWidth={2.5} />
                 </>
               ) : (
-                `must equal ${wholeAmount}`
+                `must equal ${exactAmount}`
               )}
             </span>
           </div>

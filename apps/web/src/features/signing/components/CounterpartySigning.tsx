@@ -2,10 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUpRight, Check } from "lucide-react";
+import { useAccount } from "wagmi";
 import { readSecretFromHash } from "@/lib/share-link";
-import { BrandMark, PdfThumb, Seal } from "@/components/AppShell";
+import { BrandMark, Seal } from "@/components/AppShell";
+import { PdfViewer } from "./PdfViewer";
 import { SignAndPay } from "./SignAndDeposit";
 import { getDepositTokenByAddress } from "@/lib/chain";
+
+const POST_SECRET_STATES = new Set([
+  "Active",
+  "Releasing",
+  "Released",
+  "Disputed",
+  "Closed",
+  "Rescued",
+]);
 
 type ContractInfo = {
   escrowAddress: `0x${string}`;
@@ -29,6 +40,7 @@ export function CounterpartySigning({ escrowAddress }: { escrowAddress: string }
   const [info, setInfo] = useState<ContractInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<View>("landing");
+  const { address: connectedWallet } = useAccount();
 
   useEffect(() => {
     setSecret(readSecretFromHash());
@@ -41,11 +53,7 @@ export function CounterpartySigning({ escrowAddress }: { escrowAddress: string }
       .then((d) => {
         if (cancelled) return;
         setInfo(d as ContractInfo);
-        if (
-          d.state === "Active" ||
-          d.state === "Releasing" ||
-          d.state === "Released"
-        ) {
+        if (POST_SECRET_STATES.has(d.state)) {
           setView("done");
         }
       })
@@ -71,26 +79,22 @@ export function CounterpartySigning({ escrowAddress }: { escrowAddress: string }
       </Frame>
     );
   }
-  if (!secret && view !== "done") {
-    return (
-      <Frame>
-        <p className="font-mono text-accent" style={{ fontSize: 13 }}>
-          This link is missing its access secret. Ask Party A to resend the
-          share link in full; the part after <code>#</code> is required.
-        </p>
-      </Frame>
-    );
-  }
+
+  const isPartyA =
+    connectedWallet?.toLowerCase() === info.partyAWallet.toLowerCase();
+  const canCountersign = !isPartyA && !!secret;
 
   if (view === "landing") {
     return (
       <BLanding
         info={info}
+        isPartyA={isPartyA}
+        canCountersign={canCountersign}
         onContinue={() => setView("sign")}
       />
     );
   }
-  if (view === "sign" && secret) {
+  if (view === "sign" && secret && !isPartyA) {
     return (
       <BSignPay
         info={info}
@@ -115,9 +119,13 @@ function Frame({ children }: { children: React.ReactNode }) {
 
 function BLanding({
   info,
+  isPartyA,
+  canCountersign,
   onContinue,
 }: {
   info: ContractInfo;
+  isPartyA: boolean;
+  canCountersign: boolean;
   onContinue: () => void;
 }) {
   const selectedToken = getDepositTokenByAddress(info.depositToken);
@@ -244,23 +252,60 @@ function BLanding({
           </div>
 
           <div className="mt-5 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onContinue}
-              className="bg-ink px-6 py-3.5 text-paper"
-              style={{ fontSize: 14 }}
-            >
-              <span className="inline-flex items-center gap-2">
-                Review the document
-                <ArrowRight size={14} />
-              </span>
-            </button>
-            <span
-              className="font-mono text-muted"
-              style={{ fontSize: 11 }}
-            >
-              (no wallet prompt yet)
-            </span>
+            {isPartyA ? (
+              <>
+                <span
+                  className="bg-ink px-6 py-3.5 text-paper"
+                  style={{ fontSize: 14 }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    Waiting for {info.counterpartyName ?? "counterparty"} to
+                    sign
+                  </span>
+                </span>
+                <span
+                  className="font-mono text-muted"
+                  style={{ fontSize: 11 }}
+                >
+                  (this is your deal)
+                </span>
+              </>
+            ) : canCountersign ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onContinue}
+                  className="bg-ink px-6 py-3.5 text-paper"
+                  style={{ fontSize: 14 }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    Review the document
+                    <ArrowRight size={14} />
+                  </span>
+                </button>
+                <span
+                  className="font-mono text-muted"
+                  style={{ fontSize: 11 }}
+                >
+                  (no wallet prompt yet)
+                </span>
+              </>
+            ) : (
+              <>
+                <span
+                  className="bg-ink/30 px-6 py-3.5 text-paper"
+                  style={{ fontSize: 14 }}
+                >
+                  Sign &amp; pay (link incomplete)
+                </span>
+                <span
+                  className="font-mono text-accent"
+                  style={{ fontSize: 11 }}
+                >
+                  share link is missing the part after <code>#</code>
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -272,7 +317,7 @@ function BLanding({
             <span>{info.title} · preview</span>
             <span>SHA256 · {info.pdfHash.slice(0, 6)}…{info.pdfHash.slice(-4)}</span>
           </div>
-          <PdfThumb height={400} title={info.title} />
+          <PdfViewer escrowAddress={info.escrowAddress} />
         </div>
       </div>
     </div>
@@ -490,6 +535,17 @@ function BReceipt({ info }: { info: ContractInfo }) {
             </span>
           </a>
         </div>
+      </div>
+
+      <div className="mt-10 border border-rule bg-card p-4.5">
+        <div
+          className="mb-3 flex justify-between font-mono uppercase text-muted"
+          style={{ fontSize: 10, letterSpacing: 1 }}
+        >
+          <span>{info.title} · sealed copy</span>
+          <span>SHA256 · {info.pdfHash.slice(0, 6)}…{info.pdfHash.slice(-4)}</span>
+        </div>
+        <PdfViewer escrowAddress={info.escrowAddress} signed />
       </div>
     </div>
   );

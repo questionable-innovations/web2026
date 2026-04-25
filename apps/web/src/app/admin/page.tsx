@@ -15,7 +15,6 @@ export default async function AdminPage() {
   const activeContracts = await db
     .select()
     .from(contracts)
-    .where(inArray(contracts.state, ["Active", "Releasing", "Released", "Disputed"]))
     .orderBy(desc(contracts.createdAt));
 
   // Ensure dates are parsed to strings to avoid Next.js Server-to-Client serialization issues

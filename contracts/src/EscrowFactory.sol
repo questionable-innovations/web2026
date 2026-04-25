@@ -11,6 +11,8 @@ import {Escrow} from "./Escrow.sol";
 ///      behind a 2-of-3 timelocked multisig; that affects only *future* clones.
 contract EscrowFactory {
     address public immutable implementation;
+    address public platformWallet;
+    address public aavePool;
 
     address[] public allEscrows;
     mapping(address => address[]) public escrowsByParty;
@@ -23,8 +25,10 @@ contract EscrowFactory {
 
     error NotEscrow();
 
-    constructor(address _implementation) {
+    constructor(address _implementation, address _platformWallet, address _aavePool) {
         implementation = _implementation;
+        platformWallet = _platformWallet;
+        aavePool = _aavePool;
     }
 
     /// @notice Deploy a new Escrow clone and initialize it atomically.

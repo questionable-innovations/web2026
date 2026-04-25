@@ -260,11 +260,40 @@ function Steps({ current }: { current: Stage }) {
 
 function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
   const [file, setFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [title, setTitle] = useState("");
   const [counterpartyName, setCounterpartyName] = useState("");
   const [counterpartyEmail, setCounterpartyEmail] = useState("");
   const [amount, setAmount] = useState("");
   const [days, setDays] = useState("30");
+
+  const handleFile = async (selectedFile: File | null) => {
+    setFile(selectedFile);
+    if (!selectedFile) return;
+
+    setIsAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const res = await fetch("/api/extract-contract", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.title) setTitle(data.title);
+        if (data.counterpartyName) setCounterpartyName(data.counterpartyName);
+        if (data.counterpartyEmail) setCounterpartyEmail(data.counterpartyEmail);
+        if (data.amount) setAmount(String(data.amount));
+      }
+    } catch (err) {
+      console.error("AI Extraction failed", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const deadlineLabel = useMemo(() => {
     const d = new Date(Date.now() + Number(days || 0) * 86400_000);
@@ -315,26 +344,29 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
           </div>
           <div className="flex-1">
             <div style={{ fontSize: 14 }}>
-              {file ? file.name : "Choose a PDF…"}
+              {isAnalyzing ? "Analyzing PDF with AI..." : file ? file.name : "Choose a PDF…"}
             </div>
             <div
-              className="mt-0.5 font-mono text-muted"
+              className={`mt-0.5 font-mono ${isAnalyzing ? "text-accent animate-pulse" : "text-muted"}`}
               style={{ fontSize: 11 }}
             >
-              {file
+              {isAnalyzing 
+                ? "Extracting details..."
+                : file
                 ? `${Math.round(file.size / 1024)} KB · will be hashed + pinned to IPFS`
                 : "PDF only · max 10 MB"}
             </div>
           </div>
           <span className="font-mono text-accent" style={{ fontSize: 11 }}>
-            {file ? "REPLACE" : "BROWSE"}
+            {isAnalyzing ? "..." : file ? "REPLACE" : "BROWSE"}
           </span>
           <input
             required
             type="file"
             accept="application/pdf"
             className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+            disabled={isAnalyzing}
           />
         </label>
 

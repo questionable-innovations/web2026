@@ -27,24 +27,26 @@ export async function POST(req: Request) {
       schema: z.object({
         title: z
           .string()
+          .optional()
           .describe(
-            "A short descriptive title for the contract (e.g. Services Agreement x Company)"
+            "A short descriptive title for the contract (e.g. Services Agreement x Company). Leave blank or omit if not found."
           ),
         counterpartyName: z
           .string()
-          .describe("The name of the counterparty, client, or contractor"),
+          .optional()
+          .describe("The name of the counterparty, client, or contractor. Leave blank or omit if not found."),
         counterpartyEmail: z
           .string()
-          .email()
           .optional()
-          .describe("The email address of the counterparty, if available"),
+          .describe("The email address of the counterparty, if available. Leave blank or omit if not found."),
         amount: z
           .string()
+          .optional()
           .describe(
-            "The total amount, deposit, or billing amount mentioned in the contract (numeric string only, e.g. 5000)"
+            "The total amount, deposit, or billing amount mentioned in the contract (numeric string only, e.g. 5000). Leave blank or omit if not found."
           ),
       }),
-      prompt: `Analyze the following contract document text and extract the key details defined by the schema. \n\nDocument Text:\n${pdfText}`,
+      prompt: `Analyze the following contract document text and extract the key details defined by the schema. If a piece of information is completely missing from the text, omit the field entirely or return an empty string. Do not invent information.\n\nDocument Text:\n${pdfText}`,
     });
 
     return Response.json(object);

@@ -8,7 +8,7 @@ import { forwardResolve, looksLikeEnsName, reverseResolve } from "@/lib/ens";
 
 const Wallet = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
 
-// Public reputation endpoint — explicitly excludes anything that would leak a
+// Public reputation endpoint - explicitly excludes anything that would leak a
 // counterparty or raw deal value. See project.md §3.6: counts can be public,
 // raw amounts and counterparties cannot. Per-contract entries here only carry
 // what's safe to show on a public profile (state, sealed-at, banded tier).
@@ -99,7 +99,7 @@ export async function GET(
     } else if (r.state === "Active" || r.state === "Releasing") {
       active++;
     }
-    // Rescued is intentionally counted in neither bucket — matches §4.2.
+    // Rescued is intentionally counted in neither bucket - matches §4.2.
 
     history.push({
       sealedAt: ts,

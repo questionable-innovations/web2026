@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import {
   TIER_LABEL,
   TIER_NAME,
@@ -61,7 +62,7 @@ export function ReputationCard({ wallet }: { wallet: string }) {
         setLoading(false);
         // Lazily fetch the ENS profile (avatar + text records) only after the
         // reputation core has rendered, so the page paints fast even if
-        // mainnet RPC is slow. Best-effort — no spinner, no error UI.
+        // mainnet RPC is slow. Best-effort - no spinner, no error UI.
         if (d.ensName) {
           fetch(`/api/ens?name=${encodeURIComponent(d.ensName)}&profile=1`)
             .then((r) => (r.ok ? r.json() : null))
@@ -83,7 +84,7 @@ export function ReputationCard({ wallet }: { wallet: string }) {
   }, [wallet]);
 
   // The `wallet` prop may be an ENS name (e.g. `dealseal.eth`) when the URL
-  // was `/b/<name>` — only truncate when it's an actual 0x address.
+  // was `/b/<name>` - only truncate when it's an actual 0x address.
   const isHexAddress = /^0x[0-9a-fA-F]{40}$/.test(wallet);
   const short = isHexAddress ? shortAddress(wallet) : wallet;
 
@@ -104,8 +105,9 @@ export function ReputationCard({ wallet }: { wallet: string }) {
           Couldn&apos;t load profile for {short}.
         </div>
         <div className="mt-2 text-sm text-muted">{error}</div>
-        <Link href="/b" className="mt-6 inline-block font-mono text-accent" style={{ fontSize: 12, letterSpacing: 0.5 }}>
-          ← Back to directory
+        <Link href="/b" className="mt-6 inline-flex items-center gap-1.5 font-mono text-accent" style={{ fontSize: 12, letterSpacing: 0.5 }}>
+          <ArrowLeft size={12} />
+          Back to directory
         </Link>
       </div>
     );
@@ -114,7 +116,7 @@ export function ReputationCard({ wallet }: { wallet: string }) {
   const { stats, history, displayName, ensName } = data;
   const firstSeenLabel = stats.firstSeen
     ? new Date(stats.firstSeen * 1000).toISOString().slice(0, 10)
-    : "—";
+    : "-";
   const tierName = TIER_NAME[stats.valueTier];
   const headline = pickAddressLabel({
     profileName: displayName,
@@ -128,10 +130,11 @@ export function ReputationCard({ wallet }: { wallet: string }) {
       <div className="mb-7 flex justify-end">
         <Link
           href="/b"
-          className="font-mono uppercase text-muted hover:text-ink"
+          className="inline-flex items-center gap-1.5 font-mono uppercase text-muted hover:text-ink"
           style={{ fontSize: 10, letterSpacing: 2 }}
         >
-          ← Directory · /b/{breadcrumb}
+          <ArrowLeft size={11} />
+          Directory · /b/{breadcrumb}
         </Link>
       </div>
 

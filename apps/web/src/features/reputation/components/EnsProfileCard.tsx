@@ -15,7 +15,7 @@ export type EnsProfile = {
 
 /// Visual card for an ENS profile. Used both in the lookup explorer (live
 /// preview as you type) and on the per-wallet reputation page (sidebar). All
-/// fields are optional — most ENS names only set a couple of records, so the
+/// fields are optional - most ENS names only set a couple of records, so the
 /// component degrades quietly when fields are missing.
 export function EnsProfileCard({
   profile,

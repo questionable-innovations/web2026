@@ -208,7 +208,7 @@ function Inner({
       });
 
       // Stamp B's Quick Sign block onto the existing signed PDF (which
-      // carries A's block) and re-pin. On-chain pdfHash is unchanged —
+      // carries A's block) and re-pin. On-chain pdfHash is unchanged -
       // it was always the original; the stamped artifact is the
       // human-readable audit copy (§4.3.7).
       try {

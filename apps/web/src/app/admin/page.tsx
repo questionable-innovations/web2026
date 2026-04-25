@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 export default async function AdminPage() {
   // Funds are in Aave (and accruing) until withdraw() lands and state
-  // becomes Closed. Released still holds the deposit, so include it —
+  // becomes Closed. Released still holds the deposit, so include it -
   // otherwise the interest readout drops to zero the moment both parties
   // approve, even though the money is still in the pool.
   const activeContracts = await db

@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 
 export function shortAddress(address: string | null | undefined): string {
-  if (!address) return "—";
+  if (!address) return "-";
   if (address.length <= 12) return address;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
 /// Pick the best label for an address: a profile display name beats ENS, ENS
-/// beats a truncated 0x. The ladder is intentional — profile names are the
+/// beats a truncated 0x. The ladder is intentional - profile names are the
 /// only string the user explicitly typed for *this* app, ENS is portable
 /// identity from elsewhere, the short address is the floor.
 export function pickAddressLabel(opts: {

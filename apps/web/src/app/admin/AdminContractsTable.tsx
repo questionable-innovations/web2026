@@ -18,7 +18,7 @@ const aTokenAbi = [
 
 // Aave V3 aUSDC on Avalanche
 const A_TOKEN_USDC = "0x625E7708f30cA75bfd92586e17077590C60eb4cD" as Address;
-// Native USDC on Avalanche C-chain — must match factory's aaveSupportedToken
+// Native USDC on Avalanche C-chain - must match factory's aaveSupportedToken
 // for the interest readout to be meaningful.
 const USDC_AVALANCHE = "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E" as Address;
 
@@ -117,7 +117,7 @@ export function AdminContractsTable({ contracts }: { contracts: ContractData[] }
                 <td className="px-4 py-3">${principalFormatted}</td>
                 <td className="px-4 py-3 text-green-600 dark:text-green-400 font-medium">
                   {!usdc
-                    ? "—"
+                    ? "-"
                     : interestRaw > 0n
                       ? `+$${Number(interestFormatted).toFixed(4)}`
                       : "$0.0000"}

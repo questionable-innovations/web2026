@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
 import {
   useAccount,
   useBalance,
@@ -96,10 +97,11 @@ export function UserMenu() {
     return (
       <a
         href="/new"
-        className="bg-ink px-4 py-2.5 text-[13px] text-paper"
+        className="inline-flex items-center gap-2 bg-ink px-4 py-2.5 text-[13px] text-paper"
         style={{ letterSpacing: 0.3 }}
       >
-        Sign in →
+        Sign in
+        <ArrowRight size={14} />
       </a>
     );
   }
@@ -153,12 +155,8 @@ export function UserMenu() {
             {subtitle}
           </span>
         </span>
-        <span
-          aria-hidden
-          className="font-mono text-muted"
-          style={{ fontSize: 10 }}
-        >
-          {open ? "▴" : "▾"}
+        <span aria-hidden className="text-muted">
+          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </span>
       </button>
 
@@ -187,10 +185,11 @@ export function UserMenu() {
                 <Link
                   href="/settings"
                   onClick={() => setOpen(false)}
-                  className="mt-1 inline-block font-mono uppercase text-accent"
+                  className="mt-1 inline-flex items-center gap-1 font-mono uppercase text-accent"
                   style={{ fontSize: 9, letterSpacing: 1 }}
                 >
-                  Add name & email →
+                  Add name & email
+                  <ArrowRight size={10} />
                 </Link>
               )}
             </div>
@@ -255,7 +254,10 @@ export function UserMenu() {
               href={`https://testnet.snowtrace.io/address/${address}`}
               external
             >
-              View on Snowtrace ↗
+              <span className="inline-flex items-center gap-1.5">
+                View on Snowtrace
+                <ArrowUpRight size={12} />
+              </span>
             </MenuLink>
             <MenuLink href="/settings" onClick={() => setOpen(false)}>
               Settings
@@ -317,7 +319,7 @@ function BalanceCell({ label, value }: { label: string; value: string | null }) 
         style={{ fontSize: 18, lineHeight: 1.15 }}
         title={value ?? undefined}
       >
-        {value !== null ? formatBalance(value) : "—"}
+        {value !== null ? formatBalance(value) : "-"}
       </div>
     </div>
   );

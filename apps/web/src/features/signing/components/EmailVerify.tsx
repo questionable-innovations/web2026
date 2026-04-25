@@ -7,7 +7,7 @@ import { useEmailOtp } from "../hooks/useEmailOtp";
 /// Self-contained email-verify widget. Owns the email input so parent forms
 /// don't need to track a duplicate value that can drift out of sync with the
 /// verified address. `onVerified` fires once with the address that was
-/// actually verified — use that as the source of truth.
+/// actually verified - use that as the source of truth.
 export function EmailVerify({
   initialEmail = "",
   onVerified,

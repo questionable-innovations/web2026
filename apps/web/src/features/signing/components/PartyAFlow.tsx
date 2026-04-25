@@ -34,7 +34,7 @@ import { ProfileGate, type Profile } from "./ProfileGate";
 import { PdfThumb, StateBadge } from "@/components/AppShell";
 
 /// Default URL-link validity. Decoupled from the deal deadline because the
-/// link is a bearer secret — keeping it valid for the full deal length
+/// link is a bearer secret - keeping it valid for the full deal length
 /// extends the phishing window unnecessarily. Counterparty has 7 days from
 /// the sender pressing "share" to countersign; if they miss it, partyA
 /// re-issues a link.
@@ -71,7 +71,7 @@ const STEPS: [string, Stage[]][] = [
 ];
 
 /// Wallet-first entry point. Anyone uploading a PDF must first prove they
-/// hold a wallet — that wallet becomes Party A's identity, the EIP-712
+/// hold a wallet - that wallet becomes Party A's identity, the EIP-712
 /// signer, and the address reputation accrues to.
 export function PartyAFlow() {
   return (
@@ -753,7 +753,7 @@ function SignStep({
               );
               const validUntil =
                 linkExpiry < dealDeadline ? linkExpiry : dealDeadline;
-              // Read decimals from chain — env-derived decimals risk an
+              // Read decimals from chain - env-derived decimals risk an
               // off-by-10^n bug if misconfigured.
               const decimals = (await publicClient.readContract({
                 address: depositToken.address,
@@ -797,6 +797,7 @@ function SignStep({
                   counterpartyEmail: details.counterpartyEmail,
                   counterpartyName: details.counterpartyName,
                   amount: details.amount,
+                  totalDue: details.totalDue || undefined,
                   pdfHash,
                   pdfCid: cid,
                   escrowAddress: predicted,

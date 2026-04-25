@@ -54,7 +54,7 @@ export async function POST(
     );
   }
   // Active is the immediate post-countersign state, but the deal may have
-  // moved on (Releasing/Released/Disputed/Closed) by the time this lands —
+  // moved on (Releasing/Released/Disputed/Closed) by the time this lands -
   // accept anything past AwaitingCounterparty.
   if (onchain.state === "AwaitingCounterparty" || onchain.state === "Draft") {
     return NextResponse.json(

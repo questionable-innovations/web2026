@@ -163,6 +163,22 @@ Purely an **index + UX cache**. Nothing authoritative:
 - One-click "reset demo" button on a hidden `/demo` route that redeploys fresh escrows.
 - **The memorable moment:** split-screen, two laptops. Left = contractor. Right = client. Client clicks Sign → in one transaction the PDF goes green-checked AND the dNZD number animates from client wallet into the escrow card. Cut to contractor's reputation incrementing from 12 → 13. Rehearse 20 times.
 
+### 4.6 Yield on escrow — Aave (opt-in, USDC-only)
+
+Deposits route through **Aave V3 on Avalanche** while sitting in escrow; interest is skimmed to a platform wallet at withdraw, principal returns to the payee. Lifted from §5 stretch into v1 because it's the platform's only revenue lever and doesn't change the user-facing flow.
+
+**Configured at factory deploy** (all-or-nothing, immutable):
+- `aavePool` — Aave V3 Pool address.
+- `platformWallet` — interest sink.
+- `aaveSupportedToken` — single ERC-20 routed through Aave (USDC on Avalanche). Tokens *other* than this never touch Aave, so dNZD (not Aave-listed) keeps working unchanged. The constructor reverts on partial config — all three set, or all three zero.
+
+**Per-clone behaviour:**
+- `countersign()` — supplies the deposit only if `token == aaveSupportedToken && aavePool != 0`. Uses `SafeERC20.forceApprove` (handles USDT-style allowance quirks). For non-Aave tokens, behaviour is unchanged from pre-Aave.
+- `withdraw()` — pulls principal + interest in one Aave call. **Reverts on shortfall** (pool paused / capped / illiquid). The "state change then call" ordering means the revert unwinds state back to `Released`, and partyA can retry once Aave is healthy. Never silently sends less than the released amount.
+- `rescue()` — best-effort `try/catch` Aave drain, then sweeps `token.balanceOf(this)`. Aave being broken is a plausible *cause* of needing rescue, so rescue must not depend on a healthy pool.
+
+**Why USDC-only (not "any Aave-listed asset"):** the factory has no admin and no upgrade path for an allowlist. Pinning to one token is the simplest static config that doesn't risk a future Aave listing changing security assumptions. Adding more tokens = redeploy the factory (acceptable — only affects new clones, in line with §4.2).
+
 ---
 
 ## 5. Stretch ideas (post-hackathon, or if you have slack)
@@ -171,7 +187,7 @@ Purely an **index + UX cache**. Nothing authoritative:
 - **Commit-reveal countersign.** Eliminates the mempool front-run risk on the URL secret. Two-tx UX; only worth it if the exotic attack actually shows up.
 - ~~**Arbitration module.**~~ Removed — disputes are resolved off-chain via the traditional legal system (§3.4). The smart contract holds funds and produces evidence; it does not adjudicate.
 - **Milestone splits.** Break the deposit into milestones, each released independently.
-- **Yield on escrow.** Route idle deposits into Aave/Benqi on Avalanche, split yield between parties at release. Adds smart-contract risk and complicates refunds.
+- ~~**Yield on escrow.**~~ Pulled in to v1 — see §4.6. USDC-only, single Aave V3 pool, all-or-nothing factory config. Interest goes to the platform, not split with parties (revenue lever for the platform, simpler accounting).
 - **Verifiable credentials for identity.** Integrate with a DID method (did:ethr, did:pkh) so reputation is portable across platforms.
 - **ZK-proof of "I have completed ≥10 contracts with zero disputes"** without revealing which contracts. Real reputation killer-feature.
 - **Template marketplace.** NZ-specific templates (IRD-compliant, CCCFA-aware, etc.) as a paid upsell.
@@ -354,6 +370,10 @@ Not a substitute for actual legal advice. Get a tech-and-financial-services lawy
 | Token swap changes asset depositors own | Mutable token address | Token is `immutable` on the escrow clone, set at init. |
 | PII leak via on-chain data | Naïve commitment format | Name/email stored as **salted** hashes (per-attestation salt); plaintext only off-chain. |
 | Stale share link revived months later | Capability reuse | `validUntil` on the escrow; secret marked consumed on first successful countersign. |
+| Aave shortfall silently shrinks payout | `withdraw` path with Aave enabled (§4.6) | `withdraw` reverts on `totalWithdrawn < amt` and the state revert lets partyA retry once Aave is healthy. Never sends less than the released amount. |
+| Aave outage permanently bricks rescue | `rescue` path with Aave enabled | Aave drain is `try/catch`; rescue then sweeps `token.balanceOf` regardless. Funds left in a paused pool are recoverable later via a follow-up `withdraw`. |
+| Aave brick on non-listed asset deposit | `countersign` with Aave globally enabled | Per-clone gate: only `aaveSupportedToken` clones touch Aave. dNZD and other unlisted assets bypass the supply call entirely. |
+| Stale ERC-20 allowance to Aave Pool blocks subsequent supply | USDT-style tokens reverting on non-zero→non-zero allowance | `SafeERC20.forceApprove` zeroes first, then sets, on every supply. |
 
 ### 12.2 Foundry invariants to write
 
@@ -365,3 +385,5 @@ Not a substitute for actual legal advice. Get a tech-and-financial-services lawy
 - Symbolic check (`halmos`) on `approveRelease`: no input causes funds to flow to a non-signer address.
 - URL-secret: `countersign` reverts if preimage doesn't match stored hash; succeeds exactly once; reverts after `validUntil`.
 - `rescue()` is unreachable before `RESCUE_TIMEOUT`.
+- **Aave (§4.6):** for any clone deployed against an Aave-enabled factory + supported token: post-`withdraw`, partyA's net token balance increases by exactly `amount`, and `platformWallet`'s balance increases by exactly `aBalance - amount` at withdraw time. Across `withdraw` + `rescue` paths, no token sits stranded on the clone (`token.balanceOf(clone) == 0` after termination).
+- **Aave (§4.6):** for any clone deployed against an Aave-disabled factory or a non-supported token: clone never calls into the Aave pool (mock pool reverts on any call → all happy-path tests still pass).

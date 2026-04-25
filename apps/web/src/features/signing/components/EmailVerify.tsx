@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Check } from "lucide-react";
 import { useEmailOtp } from "../hooks/useEmailOtp";
 
 /// Self-contained email-verify widget. Owns the email input so parent forms
 /// don't need to track a duplicate value that can drift out of sync with the
 /// verified address. `onVerified` fires once with the address that was
-/// actually verified — use that as the source of truth.
+/// actually verified - use that as the source of truth.
 export function EmailVerify({
   initialEmail = "",
   onVerified,
@@ -19,7 +20,12 @@ export function EmailVerify({
   const [code, setCode] = useState("");
 
   if (otp.stage === "verified") {
-    return <p className="text-sm text-emerald-300">✓ {otp.email} verified</p>;
+    return (
+      <p className="inline-flex items-center gap-1.5 text-sm text-emerald-300">
+        <Check size={14} strokeWidth={2.5} />
+        {otp.email} verified
+      </p>
+    );
   }
 
   if (otp.stage === "sent" || otp.stage === "verifying") {

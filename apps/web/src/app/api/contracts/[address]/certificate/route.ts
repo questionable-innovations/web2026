@@ -5,7 +5,7 @@ import { contracts } from "@/server/db/schema";
 import { pinata } from "@/lib/ipfs";
 import { buildAuditCertificate, CertError } from "@/lib/certificate";
 
-/// GET — return the audit certificate PDF. If we've already pinned one for
+/// GET - return the audit certificate PDF. If we've already pinned one for
 /// this escrow, redirect to the gateway URL (immutable archival per §11.2);
 /// otherwise build it on demand from current on-chain state.
 export async function GET(
@@ -43,7 +43,7 @@ export async function GET(
   }
 }
 
-/// POST — pin the certificate to IPFS. Idempotent: if `auditCertCid` is
+/// POST - pin the certificate to IPFS. Idempotent: if `auditCertCid` is
 /// already set in fieldsJson, returns it without rebuilding. Triggered by
 /// the client once the escrow reaches Released so the cert is preserved
 /// even if the off-chain DB later disappears.
@@ -77,7 +77,7 @@ export async function POST(
     throw err;
   }
 
-  // Only pin once the escrow has actually reached a release-terminal state —
+  // Only pin once the escrow has actually reached a release-terminal state -
   // otherwise we'd archive a half-baked lifecycle and never refresh it.
   if (built.state !== "Released" && built.state !== "Closed") {
     return NextResponse.json(

@@ -15,7 +15,7 @@ const ACTIVE_STATES = [
 // Lists wallets with at least one post-countersign contract, sorted by
 // most-recent activity. Used by the /b lookup landing as a directory of
 // profiles a viewer can drill into. Counterparty wallets and raw amounts are
-// not returned — only the wallet itself, its registered display name (if any),
+// not returned - only the wallet itself, its registered display name (if any),
 // and a count of contracts surfaced. Same privacy posture as the per-wallet
 // endpoint.
 export async function GET() {

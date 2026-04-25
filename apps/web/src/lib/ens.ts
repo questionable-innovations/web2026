@@ -51,7 +51,7 @@ function writeCache<T>(
 
 /// Reverse-resolve a wallet address to its primary ENS name (e.g. `vitalik.eth`).
 /// Returns null when the address has no primary name set on mainnet, or if the
-/// mainnet RPC is unreachable — display code should fall back to a shortened
+/// mainnet RPC is unreachable - display code should fall back to a shortened
 /// address. We deliberately swallow RPC errors so a flaky mainnet endpoint
 /// can't break the reputation page.
 export async function reverseResolve(
@@ -107,7 +107,7 @@ export async function forwardResolve(
   }
 }
 
-/// Resolve many addresses at once for list views. Concurrent but bounded —
+/// Resolve many addresses at once for list views. Concurrent but bounded -
 /// mainnet RPCs throttle aggressive callers. Order matches input.
 export async function reverseResolveMany(
   addresses: readonly `0x${string}`[],
@@ -138,7 +138,7 @@ const TEXT_KEYS = [
 ] as const;
 
 /// Resolve an ENS name to its full profile: address + avatar + selected text
-/// records. We fetch records in parallel and tolerate per-record failures —
+/// records. We fetch records in parallel and tolerate per-record failures -
 /// missing records are common (most names only set a couple), so we never
 /// fail the whole call when one lookup throws. Avatar resolution uses viem's
 /// helper which already handles `eip155:` NFT URIs and IPFS gateways.

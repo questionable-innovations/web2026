@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { useAccount } from "wagmi";
-import { WalletBadge } from "@/features/signing/components/WalletGate";
+import { UserMenu } from "@/components/UserMenu";
 
 export type ContractState =
   | "Draft"
@@ -68,10 +68,7 @@ export function AppNav({
         </nav>
       </div>
       <div className="flex items-center gap-3.5">
-        <WalletBadge />
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink font-serif text-[11px] text-paper">
-          {wallet ? wallet.slice(2, 3).toUpperCase() : "·"}
-        </span>
+        <UserMenu />
       </div>
     </header>
   );

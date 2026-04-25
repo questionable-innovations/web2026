@@ -30,7 +30,7 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
         opacity="0.3"
       />
 
-      {states.map((s, i) => (
+      {states.map((s) => (
         <g key={s.id} transform={`translate(${s.x}, ${yMain})`}>
           <rect
             x={-boxW / 2}

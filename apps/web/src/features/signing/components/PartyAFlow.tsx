@@ -47,6 +47,7 @@ type Details = {
   counterpartyName: string;
   counterpartyEmail: string;
   amount: string;
+  totalDue: string;
   dealDeadline: number;
 };
 
@@ -164,6 +165,7 @@ function Inner({
 
       {stage === "details" && (
         <DetailsStep
+          initial={details}
           onNext={(d) => {
             setDetails(d);
             setStage("sign");
@@ -258,14 +260,31 @@ function Steps({ current }: { current: Stage }) {
   );
 }
 
-function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
-  const [file, setFile] = useState<File | null>(null);
+function DetailsStep({
+  onNext,
+  initial,
+}: {
+  onNext: (d: Details) => void;
+  initial: Details | null;
+}) {
+  const [file, setFile] = useState<File | null>(initial?.file ?? null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [title, setTitle] = useState("");
-  const [counterpartyName, setCounterpartyName] = useState("");
-  const [counterpartyEmail, setCounterpartyEmail] = useState("");
-  const [amount, setAmount] = useState("");
-  const [days, setDays] = useState("30");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [counterpartyName, setCounterpartyName] = useState(
+    initial?.counterpartyName ?? "",
+  );
+  const [counterpartyEmail, setCounterpartyEmail] = useState(
+    initial?.counterpartyEmail ?? "",
+  );
+  const [amount, setAmount] = useState(initial?.amount ?? "");
+  const [totalDue, setTotalDue] = useState(initial?.totalDue ?? "");
+  const [days, setDays] = useState(() => {
+    if (!initial) return "";
+    const remaining = Math.round(
+      (initial.dealDeadline - Date.now() / 1000) / 86_400,
+    );
+    return String(Math.max(1, remaining));
+  });
 
   const handleFile = async (selectedFile: File | null) => {
     setFile(selectedFile);
@@ -287,13 +306,16 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
         if (data.counterpartyName) setCounterpartyName(data.counterpartyName);
         if (data.counterpartyEmail) setCounterpartyEmail(data.counterpartyEmail);
         if (data.amount) setAmount(String(data.amount));
+        if (data.totalDue) setTotalDue(String(data.totalDue));
+        if (data.daysUntilDeadline) setDays(String(data.daysUntilDeadline));
       } else {
         const errText = await res.text();
         alert(`API Error: ${errText}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("AI Extraction failed", err);
-      alert(`Network Error: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+      alert(`Network Error: ${errorMessage}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -320,6 +342,7 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
           counterpartyName,
           counterpartyEmail,
           amount,
+          totalDue,
           dealDeadline: Math.floor(Date.now() / 1000) + dayCount * 86_400,
         });
       }}
@@ -412,6 +435,31 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
         </div>
 
         <div style={{ height: 22 }} />
+        <div className="ds-eyebrow mb-2">Total Due</div>
+        <div
+          className="flex items-baseline gap-2 bg-paper px-4 py-3.5"
+          style={{ border: "1px solid var(--color-rule)" }}
+        >
+          <span className="font-mono text-muted" style={{ fontSize: 12 }}>
+            NZD
+          </span>
+          <input
+            inputMode="decimal"
+            value={totalDue}
+            onChange={(e) => setTotalDue(e.target.value)}
+            placeholder="10,000.00"
+            className="flex-1 bg-transparent font-serif outline-none"
+            style={{ fontSize: 32, lineHeight: 1 }}
+          />
+          <span
+            className="font-mono uppercase text-muted"
+            style={{ fontSize: 10, letterSpacing: 1 }}
+          >
+            = {totalDue || "0"} {depositToken.symbol}
+          </span>
+        </div>
+
+        <div style={{ height: 22 }} />
         <div className="ds-eyebrow mb-2">Deposit</div>
         <div
           className="grid gap-3"
@@ -499,7 +547,7 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
               Quick Sign
             </span>
           </div>
-          <PdfThumb height={210} />
+          {file ? <PdfViewer file={file} /> : <PdfThumb height={210} />}
         </div>
         <div className="mt-4 bg-ink p-5 text-paper">
           <div
@@ -624,6 +672,16 @@ function SignStep({
             </p>
           )}
         </div>
+
+        <button
+          type="button"
+          disabled={stage !== "sign"}
+          onClick={() => setStage("details")}
+          className="w-full border border-rule px-5 py-3 text-ink disabled:opacity-50"
+          style={{ fontSize: 13 }}
+        >
+          ← Back to details
+        </button>
 
         <button
           type="button"
@@ -850,6 +908,7 @@ function Summary({
         k="Counterparty"
         v={`${details.counterpartyName} · ${details.counterpartyEmail}`}
       />
+      <Row k="Total Due" v={`${details.totalDue || "0"} ${depositToken.symbol}`} />
       <Row k="Deposit" v={`${details.amount} ${depositToken.symbol}`} />
       <Row k="You" v={`${profile.name} · ${profile.email}`} />
       <Row k="Wallet" v={`${wallet.slice(0, 6)}…${wallet.slice(-4)}`} />
@@ -993,6 +1052,7 @@ function ShareStep({
           <div className="font-mono" style={{ fontSize: 11, lineHeight: 1.8 }}>
             <Row k="escrow" v={trimmedAddr} />
             <Row k="amount" v={`${details.amount} ${depositToken.symbol}`} />
+            <Row k="total due" v={`${details.totalDue || "0"} ${depositToken.symbol}`} />
             <Row
               k="validUntil"
               v={`+${Math.round(

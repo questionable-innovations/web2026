@@ -15,6 +15,7 @@ type ContractInfo = {
   counterpartyEmailMasked: string | null;
   counterpartyName: string | null;
   depositAmount: string;
+  totalDue: string | null;
   depositToken: `0x${string}`;
   dealDeadline: number | null;
   state: string;
@@ -184,6 +185,26 @@ function BLanding({
             />
 
             <div className="grid grid-cols-2 gap-3">
+              {info.totalDue && (
+                <div>
+                  <div
+                    className="font-mono uppercase text-muted"
+                    style={{ fontSize: 10, letterSpacing: 1 }}
+                  >
+                    Total due
+                  </div>
+                  <div
+                    className="mt-1 font-serif"
+                    style={{ fontSize: 36, lineHeight: 1 }}
+                  >
+                    ${Number(info.totalDue).toLocaleString()}
+                    <span className="text-muted" style={{ fontSize: 14 }}>
+                      {" "}
+                      {depositToken.symbol}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div>
                 <div
                   className="font-mono uppercase text-muted"
@@ -260,28 +281,22 @@ function BSignPay({
 }) {
   return (
     <div className="min-h-screen bg-ink text-paper">
-      <div
-        className="flex items-center justify-between border-b px-8 py-5"
-        style={{ borderColor: "rgba(255,255,255,0.08)" }}
-      >
+      <div className="flex items-center justify-between border-b border-ink-rule-soft px-8 py-5">
         <span
-          className="font-serif"
-          style={{ fontSize: 22, letterSpacing: -0.4, color: "var(--color-paper)" }}
+          className="font-serif text-paper"
+          style={{ fontSize: 22, letterSpacing: -0.4 }}
         >
           DealSeal
         </span>
         <div
-          className="flex gap-6 font-mono"
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}
+          className="flex gap-6 font-mono text-ink-muted"
+          style={{ fontSize: 11 }}
         >
-          <span style={{ color: "rgba(255,255,255,0.25)" }}>① REVIEW ✓</span>
-          <span style={{ color: "rgba(255,255,255,0.9)" }}>② SIGN &amp; PAY</span>
-          <span style={{ color: "rgba(255,255,255,0.25)" }}>③ DONE</span>
+          <span className="text-ink-faint">① REVIEW ✓</span>
+          <span className="text-paper">② SIGN &amp; PAY</span>
+          <span className="text-ink-faint">③ DONE</span>
         </div>
-        <span
-          className="font-mono"
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}
-        >
+        <span className="font-mono text-ink-muted" style={{ fontSize: 11 }}>
           escrow {info.escrowAddress.slice(0, 6)}…{info.escrowAddress.slice(-4)}
         </span>
       </div>
@@ -307,8 +322,8 @@ function BSignPay({
               <em className="text-accent not-italic">and</em> place the deposit.
             </h1>
             <p
-              className="max-w-md leading-relaxed"
-              style={{ fontSize: 15, color: "rgba(255,255,255,0.85)" }}
+              className="max-w-md leading-relaxed text-ink-soft"
+              style={{ fontSize: 15 }}
             >
               Both halves commit atomically. If the deposit fails, the
               signature reverts. There is no in-between state.
@@ -412,6 +427,12 @@ function BReceipt({ info }: { info: ContractInfo }) {
               v={`${info.depositAmount} ${depositToken.symbol}`}
               accent
             />
+            {info.totalDue && (
+              <ReceiptRow
+                k="totalDue"
+                v={`${info.totalDue} ${depositToken.symbol}`}
+              />
+            )}
             <ReceiptRow k="release" v="requires both ✓" />
           </div>
           <a

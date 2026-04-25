@@ -43,16 +43,29 @@ export async function POST(req: Request) {
           .string()
           .optional()
           .describe(
-            "The total amount, deposit, or billing amount mentioned in the contract (numeric string only, e.g. 5000). Leave blank or omit if not found."
+            "The deposit amount or upfront payment mentioned in the contract (numeric string only, e.g. 5000). Leave blank or omit if not found."
+          ),
+        totalDue: z
+          .string()
+          .optional()
+          .describe(
+            "The total due or total billing amount mentioned in the contract (numeric string only, e.g. 10000). Leave blank or omit if not found."
+          ),
+        daysUntilDeadline: z
+          .number()
+          .optional()
+          .describe(
+            "The number of days until the deal deadline or expiration, if explicitly stated (e.g. 30, 21, 60). Leave blank or omit if not found."
           ),
       }),
       prompt: `Analyze the following contract document text and extract the key details defined by the schema. If a piece of information is completely missing from the text, omit the field entirely or return an empty string. Do not invent information.\n\nDocument Text:\n${pdfText}`,
     });
 
     return Response.json(object);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("PDF Extraction error:", error);
-    return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), {
+    const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
     });
   }

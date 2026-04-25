@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import { SignPayHero } from "@/components/SignPayHero";
 import { StateMachine } from "@/components/StateMachine";
+import { activeChain, depositToken } from "@/lib/chain";
 
 const SECTION_PAD = "px-20";
 
@@ -110,7 +111,7 @@ function Hero() {
     <Section pad="pb-16 pt-20" border={false}>
       <div className="grid items-center gap-14 lg:grid-cols-2">
         <div>
-          <Eyebrow accent>Now in open beta · Avalanche</Eyebrow>
+          <Eyebrow accent>{activeChain.name} demo · Web3 NZ 2026</Eyebrow>
           <h1
             className="mt-6 font-serif font-normal"
             style={{ fontSize: 88, lineHeight: 0.98, letterSpacing: -2 }}
@@ -123,9 +124,9 @@ function Hero() {
             className="mt-7 max-w-lg leading-relaxed text-ink/80"
             style={{ fontSize: 19 }}
           >
-            DealSeal collapses the contract and the deposit into a single
-            cryptographic act. One signature commits the document and moves
-            the money into escrow — atomic, on Avalanche.
+            DealSeal turns countersigning into the escrow deposit. Party A
+            creates the agreement first; Party B completes the deal in one
+            on-chain transaction that signs and funds the escrow together.
           </p>
           <div className="mt-9 flex gap-3">
             <Link
@@ -147,8 +148,8 @@ function Hero() {
             className="mt-10 flex flex-wrap gap-7 font-mono uppercase text-muted"
             style={{ fontSize: 11, letterSpacing: 1 }}
           >
-            <span>Avax C-chain</span>
-            <span>· dNZD-denominated</span>
+            <span>{activeChain.name}</span>
+            <span>· {depositToken.symbol} deposit token</span>
             <span>· Non-custodial</span>
           </div>
         </div>
@@ -172,20 +173,20 @@ function KnowYoureBeingPaid() {
     {
       q: "Will they actually pay?",
       a: "They already have.",
-      d: "The signature and the deposit are one transaction. If the deposit fails, the signature reverts. There is no signed contract with an unpaid deposit — by construction.",
+      d: "Party B countersigns and funds the escrow in one transaction. If the token transfer fails, the countersign transaction reverts too.",
       meta: "safeTransferFrom + countersign() · atomic",
     },
     {
-      q: "How do I know the funds are real?",
-      a: "You can read the chain.",
-      d: "Click the deposit on any contract page and you land on the live escrow address — the dNZD balance, the deposit tx, the block number. Public. Yours to verify.",
-      meta: "view on Snowtrace · dNZD balance",
+      q: "What can I verify before signing?",
+      a: "The contract page shows the deal itself.",
+      d: "Before any wallet prompt, the counterparty flow loads the PDF preview, Party A identity details from the audit record, the deposit amount, and the document hash.",
+      meta: "PDF preview · amount · hash",
     },
     {
       q: "Can they pull the deposit back?",
       a: "No. Only mutual approval releases.",
-      d: "The escrow has no admin key, no upgrade path, no withdraw path. Once the deposit lands, it moves only when both wallets approve — to you. Or, in dispute, nowhere at all.",
-      meta: "immutable · no admin · no upgrade",
+      d: "Each escrow clone has no admin key and no upgrade path. After funding, release still needs both signers to approve, and the final withdrawal pays Party A.",
+      meta: "immutable clone · mutual approval",
     },
   ];
   return (
@@ -211,9 +212,9 @@ function KnowYoureBeingPaid() {
             className="m-0 max-w-xs leading-relaxed text-ink/70"
             style={{ fontSize: 15 }}
           >
-            The deposit isn&apos;t a promise. It&apos;s already in escrow when
-            the contract is signed — verifiable, on-chain, before line one of
-            your invoice exists.
+            The deposit isn&apos;t a promise. Once Party B countersigns, the
+            deposit is already in escrow in that same transaction — verifiable,
+            on-chain, before the work starts.
           </p>
         </div>
       </div>
@@ -263,7 +264,7 @@ function KnowYoureBeingPaid() {
 
       <div
         className="mt-8 grid items-center gap-8 bg-ink px-9 py-7 text-paper"
-        style={{ gridTemplateColumns: "180px 1fr auto" }}
+        style={{ gridTemplateColumns: "220px 1fr" }}
       >
         <div>
           <div
@@ -288,17 +289,10 @@ function KnowYoureBeingPaid() {
           className="flex flex-wrap gap-7 font-mono"
           style={{ fontSize: 11, color: "rgba(255,255,255,0.9)" }}
         >
-          <ReceiptCell label="Escrow" value="0xE5c4…2a91" />
-          <ReceiptCell label="Deposit tx" value="0x7b3c…f41e" />
-          <ReceiptCell label="Block" value="48,219,331" />
-          <ReceiptCell label="Release" value="requires both ✓" accent />
+          <ReceiptCell label="Escrow model" value="Per-deal contract clone" />
+          <ReceiptCell label="Counterparty link" value="Secret lives in URL fragment" />
+          <ReceiptCell label="Release" value="Requires both signers" accent />
         </div>
-        <span
-          className="bg-accent px-4 py-3 text-white"
-          style={{ fontSize: 12, letterSpacing: 0.5 }}
-        >
-          Verify on Snowtrace ↗
-        </span>
       </div>
     </Section>
   );
@@ -357,18 +351,18 @@ function HowItWorks() {
   const steps = [
     {
       n: "01",
-      t: "Upload & sign first",
-      d: "You upload the PDF, sign it, and set the deposit amount in NZD. The PDF is content-addressed to IPFS; its hash is committed on-chain.",
+      t: "Create the escrow draft",
+      d: "Party A uploads the PDF, sets the deposit, signs an attestation, and deploys an escrow clone with the PDF hash, token amount, and share-link secret hash.",
     },
     {
       n: "02",
       t: "Send the share link",
-      d: "Your counterparty receives a link with the secret in the URL fragment — never logged, never indexable. They review the document before any wallet prompts.",
+      d: "The counterparty receives the escrow link with the secret in the URL fragment. They can load the document and review the amount before they connect a wallet.",
     },
     {
       n: "03",
       t: "They sign + pay, atomic",
-      d: "One transaction binds their signature and moves dNZD into the per-deal escrow. Funds release only when both of you approve.",
+      d: `One transaction calls countersign() and transfers ${depositToken.symbol} into escrow. Later, release still requires one signer to propose and the other to approve.`,
     },
   ];
   return (
@@ -446,9 +440,8 @@ function StateMachineSection() {
             className="m-0 max-w-xs leading-relaxed text-ink/70"
             style={{ fontSize: 14 }}
           >
-            Each escrow is a per-deal contract clone — immutable, no admin
-            key, no upgrade path. The state machine below is the entire
-            surface.
+            This matches the contract enum and methods in `Escrow.sol`,
+            including the terminal withdraw and rescue paths.
           </p>
         </div>
       </div>
@@ -462,7 +455,7 @@ function StateMachineSection() {
         <span>Fig. 2 — Escrow lifecycle</span>
         <span>EIP-1167 minimal proxy</span>
         <span>·</span>
-        <span>No admin, no upgrade path</span>
+        <span>Closed after withdraw · rescue after timeout</span>
       </div>
     </Section>
   );
@@ -486,19 +479,19 @@ function Reputation() {
             className="max-w-md leading-relaxed text-ink/80"
             style={{ fontSize: 17 }}
           >
-            Every completed contract accrues to your wallet — visible counts
-            and dispute rate, never raw dollar amounts or counterparty names.
-            An NZ contractor&apos;s track record travels with them.
+            Reputation in this build is wallet-based. The app surfaces
+            contract counts and dispute status without exposing counterparty
+            names or raw payment amounts on the landing page.
           </p>
           <div
             className="mt-8 font-mono"
             style={{ fontSize: 12, letterSpacing: 0.5 }}
           >
             {[
-              ["Completed", "14"],
-              ["Disputed", "0"],
-              ["Dispute rate", "0.0%"],
-              ["First seen", "2025-08-14"],
+              ["Completed", "counted from released deals"],
+              ["Disputed", "counted from disputed deals"],
+              ["Dispute rate", "derived from totals"],
+              ["First seen", "based on indexed history"],
             ].map(([k, v], i, arr) => (
               <div
                 key={k}
@@ -522,15 +515,15 @@ function Reputation() {
         <div className="border border-rule bg-card p-8">
           <div className="flex items-baseline justify-between">
             <div>
-              <Eyebrow>Public profile</Eyebrow>
+              <Eyebrow>Reputation view</Eyebrow>
               <div
                 className="mt-1.5 font-serif"
                 style={{ fontSize: 32 }}
               >
-                0xA1c4…f39c
+                Wallet-scoped profile
               </div>
               <div className="mt-1 text-[13px] text-muted">
-                Wellington · Independent contractor
+                Connected wallet plus indexed contract history
               </div>
             </div>
             <div
@@ -541,7 +534,7 @@ function Reputation() {
                 letterSpacing: 1,
               }}
             >
-              TIER · TRUSTED
+              PUBLIC SUMMARY
             </div>
           </div>
 
@@ -552,9 +545,9 @@ function Reputation() {
             style={{ gap: 1, background: "var(--color-rule)" }}
           >
             {[
-              ["14", "Completed"],
-              ["0", "Disputed"],
-              ["18mo", "On platform"],
+              ["Released", "Completed deals"],
+              ["Disputed", "Flagged deals"],
+              ["First seen", "Indexed start"],
             ].map(([v, l]) => (
               <div key={l} className="bg-card px-4 py-5">
                 <div className="font-serif" style={{ fontSize: 36, lineHeight: 1 }}>
@@ -575,9 +568,9 @@ function Reputation() {
             className="font-mono text-muted"
             style={{ fontSize: 11, lineHeight: 1.6 }}
           >
-            <div>Last contract · 2026-04-02</div>
-            <div>Total value · banded · NZD 25–50k tier</div>
-            <div>Counterparties · hidden</div>
+            <div>Amounts can be banded instead of shown raw</div>
+            <div>Counterparties stay hidden</div>
+            <div>Wallet remains the identity anchor</div>
           </div>
         </div>
       </div>
@@ -617,9 +610,9 @@ function ClosingCTA() {
             className="mt-6 max-w-xl leading-relaxed"
             style={{ fontSize: 16, color: "rgba(245,243,238,0.75)" }}
           >
-            No account to create. No card to enter. Connect a wallet — or
-            sign in with email and we&apos;ll create one for you — upload
-            the PDF, set the deposit, send the link.
+            Start from a wallet session, upload the PDF, set the deposit,
+            then send the counterparty link. If Privy is configured, the app
+            can also create an embedded wallet during sign-in.
           </p>
           <div className="mt-10 flex flex-wrap gap-3.5">
             <Link
@@ -657,7 +650,7 @@ function Footer() {
       }}
     >
       <span>DEALSEAL.NZ · © 2026</span>
-      <span>NON-CUSTODIAL · AVALANCHE C-CHAIN · DNZD-DENOMINATED</span>
+      <span>{`NON-CUSTODIAL · ${activeChain.name.toUpperCase()} · ${depositToken.symbol.toUpperCase()} DEPOSIT FLOW`}</span>
       <span>SOURCE · CONTRACTS · LEGAL</span>
     </footer>
   );

@@ -1,13 +1,14 @@
 export function StateMachine({ compact = false }: { compact?: boolean }) {
   const states = [
-    { id: "draft", label: "Draft", x: 80, desc: "A uploads PDF" },
-    { id: "await", label: "Awaiting B", x: 290, desc: "Share link sent" },
-    { id: "active", label: "Active", x: 500, desc: "Both signed · funds held" },
-    { id: "release", label: "Releasing", x: 710, desc: "Mutual approval" },
-    { id: "done", label: "Released", x: 920, desc: "Funds → payee" },
+    { id: "draft", label: "Draft", x: 80, desc: "Initial enum state only" },
+    { id: "await", label: "Awaiting", x: 250, desc: "Party A signed · link sent" },
+    { id: "active", label: "Active", x: 420, desc: "Party B signed + deposit held" },
+    { id: "release", label: "Releasing", x: 590, desc: "One signer proposed release" },
+    { id: "released", label: "Released", x: 760, desc: "Both signers approved" },
+    { id: "closed", label: "Closed", x: 930, desc: "Party A withdrew funds" },
   ];
-  const W = 1040;
-  const H = compact ? 220 : 280;
+  const W = 1060;
+  const H = compact ? 230 : 320;
   const yMain = compact ? 110 : 130;
   const ink = "var(--color-ink)";
   const accent = "var(--color-accent)";
@@ -19,7 +20,7 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
       <line
         x1={80}
         y1={yMain}
-        x2={920}
+        x2={930}
         y2={yMain}
         stroke={ink}
         strokeWidth="1"
@@ -51,7 +52,7 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
           >
             {s.desc}
           </text>
-          {i === states.length - 1 && (
+          {s.id === "closed" && (
             <circle cx={0} cy={0} r={26} fill="none" stroke={accent} strokeWidth="1.5" />
           )}
         </g>
@@ -73,16 +74,16 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
       {!compact && (
         <g>
           <path
-            d={`M 500 ${yMain + 22} Q 500 ${yMain + 60} 560 ${yMain + 80}`}
+            d={`M 420 ${yMain + 22} Q 420 ${yMain + 60} 510 ${yMain + 88}`}
             fill="none"
             stroke={accent}
             strokeWidth="1"
             strokeDasharray="2 3"
           />
-          <rect x={560} y={yMain + 70} width={120} height={28} fill={paper} stroke={accent} strokeWidth="1" />
+          <rect x={510} y={yMain + 74} width={116} height={28} fill={paper} stroke={accent} strokeWidth="1" />
           <text
-            x={620}
-            y={yMain + 88}
+            x={568}
+            y={yMain + 92}
             textAnchor="middle"
             fontFamily="var(--font-sans)"
             fontSize="11"
@@ -92,24 +93,66 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
             Disputed
           </text>
           <text
-            x={620}
-            y={yMain + 110}
+            x={568}
+            y={yMain + 114}
             textAnchor="middle"
             fontFamily="var(--font-mono)"
             fontSize="9"
             fill={muted}
           >
-            Funds held until resolved
+            flagDispute()
+          </text>
+          <text
+            x={568}
+            y={yMain + 126}
+            textAnchor="middle"
+            fontFamily="var(--font-mono)"
+            fontSize="9"
+            fill={muted}
+          >
+            cancelDispute() restores prior state
+          </text>
+
+          <path
+            d={`M 590 ${yMain + 22} Q 590 ${yMain + 64} 860 ${yMain + 88}`}
+            fill="none"
+            stroke={ink}
+            strokeWidth="1"
+            strokeDasharray="2 3"
+            opacity="0.45"
+          />
+          <rect x={860} y={yMain + 74} width={120} height={28} fill={paper} stroke={ink} strokeWidth="1" opacity="0.8" />
+          <text
+            x={920}
+            y={yMain + 92}
+            textAnchor="middle"
+            fontFamily="var(--font-sans)"
+            fontSize="11"
+            fill={ink}
+            fontWeight="600"
+          >
+            Rescued
+          </text>
+          <text
+            x={920}
+            y={yMain + 114}
+            textAnchor="middle"
+            fontFamily="var(--font-mono)"
+            fontSize="9"
+            fill={muted}
+          >
+            Any funded state + 365d timeout
           </text>
         </g>
       )}
 
       {!compact &&
         [
-          { x: 185, label: "pdf hash on-chain" },
-          { x: 395, label: "countersign + deposit" },
-          { x: 605, label: "proposeRelease()" },
-          { x: 815, label: "approveRelease()" },
+          { x: 165, label: "initialize()" },
+          { x: 335, label: "countersign() + deposit" },
+          { x: 505, label: "proposeRelease()" },
+          { x: 675, label: "approveRelease()" },
+          { x: 845, label: "withdraw()" },
         ].map((l, i) => (
           <text
             key={i}

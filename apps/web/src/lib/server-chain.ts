@@ -8,7 +8,7 @@ const chain = id === 43114 ? avalanche : avalancheFuji;
 const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL;
 
 /// Server-side viem client. Used by API routes to verify that on-chain state
-/// matches what a client claims before persisting to the off-chain index —
+/// matches what a client claims before persisting to the off-chain index -
 /// without this, anyone with an escrow address could POST forged metadata.
 export const serverPublicClient = createPublicClient({
   chain,
@@ -35,6 +35,10 @@ export type OnchainEscrow = {
   token: `0x${string}`;
   amount: bigint;
   factory: `0x${string}`;
+  proposedReleaseBy: `0x${string}`;
+  withdrawable: bigint;
+  disputedBy: `0x${string}`;
+  disputeReason: string;
 };
 
 const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
@@ -48,54 +52,85 @@ export async function readEscrow(
   const code = await serverPublicClient.getCode({ address });
   if (!code || code === "0x") return null;
 
-  const [stateNum, partyA, partyB, pdfHash, token, amount, factory] =
-    await Promise.all([
-      serverPublicClient.readContract({
-        address,
-        abi: escrowAbi,
-        functionName: "state",
-      }) as Promise<number>,
-      serverPublicClient.readContract({
-        address,
-        abi: escrowAbi,
-        functionName: "partyA",
-      }) as Promise<`0x${string}`>,
-      serverPublicClient.readContract({
-        address,
-        abi: escrowAbi,
-        functionName: "partyB",
-      }) as Promise<`0x${string}`>,
-      serverPublicClient.readContract({
-        address,
-        abi: escrowAbi,
-        functionName: "pdfHash",
-      }) as Promise<`0x${string}`>,
-      serverPublicClient.readContract({
-        address,
-        abi: escrowAbi,
-        functionName: "token",
-      }) as Promise<`0x${string}`>,
-      serverPublicClient.readContract({
-        address,
-        abi: escrowAbi,
-        functionName: "amount",
-      }) as Promise<bigint>,
-      serverPublicClient.readContract({
-        address,
-        abi: escrowAbi,
-        functionName: "factory",
-      }) as Promise<`0x${string}`>,
-    ]);
+  const [
+    stateNum,
+    partyA,
+    partyB,
+    pdfHash,
+    token,
+    amount,
+    factory,
+    proposedReleaseBy,
+    withdrawable,
+    disputedBy,
+    disputeReason,
+  ] = await Promise.all([
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "state",
+    }) as Promise<number>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "partyA",
+    }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "partyB",
+    }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "pdfHash",
+    }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "token",
+    }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "amount",
+    }) as Promise<bigint>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "factory",
+    }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "proposedReleaseBy",
+    }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "withdrawable",
+    }) as Promise<bigint>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "disputedBy",
+    }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "disputeReason",
+    }) as Promise<string>,
+  ]);
 
   // Be strict: an out-of-range state means the contract has been upgraded
-  // and this server is stale — fail loudly rather than silently mislabeling
+  // and this server is stale - fail loudly rather than silently mislabeling
   // the deal as "Draft".
   const stateName = STATE_NAMES[stateNum];
   if (!stateName) {
     throw new Error(`unknown escrow state ${stateNum}`);
   }
 
-  // Reject clones that didn't come from our configured factory — without
+  // Reject clones that didn't come from our configured factory - without
   // this, a bystander could deploy their own escrow with the same ABI
   // shape and pass every other on-chain check.
   if (
@@ -113,6 +148,10 @@ export async function readEscrow(
     token,
     amount,
     factory,
+    proposedReleaseBy,
+    withdrawable,
+    disputedBy,
+    disputeReason,
   };
 }
 

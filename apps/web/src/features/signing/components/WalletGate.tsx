@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { ArrowRight } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
 import type { Connector } from "wagmi";
 import { usePrivy } from "@privy-io/react-auth";
@@ -8,11 +9,11 @@ import { usePrivy } from "@privy-io/react-auth";
 /// Gate for any flow that requires a connected wallet. Renders a sign-in
 /// surface if the user isn't connected, then hands the address down to the
 /// children. This is the only place in the app that asks "are you signed in?"
-/// — every downstream step assumes the wallet is established.
+/// - every downstream step assumes the wallet is established.
 export function WalletGate({
   children,
   title = "Sign in to seal a deal",
-  blurb = "DealSeal is wallet-first. Your wallet is your identity, your signature, and the source of your reputation. Pick one method below — every option leads to the same desk.",
+  blurb = "DealSeal is wallet-first. Your wallet is your identity, your signature, and the source of your reputation. Pick one method below; every option leads to the same desk.",
 }: {
   children: (address: `0x${string}`) => ReactNode;
   title?: string;
@@ -31,7 +32,7 @@ export function WalletGate({
 
   const hasPrivy = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID && privy;
 
-  // Drop the privy connector — that's surfaced through the dedicated embedded
+  // Drop the privy connector - that's surfaced through the dedicated embedded
   // button, not as a generic wallet.
   const wallets = connectors.filter(
     (c) => c.id !== "privy" && c.type !== "privy",
@@ -40,7 +41,7 @@ export function WalletGate({
   // Wagmi auto-discovers wallets via EIP-6963 in addition to the generic
   // `injected()` connector configured in lib/wagmi. When announced wallets
   // exist, the generic one is strictly worse (non-deterministic, no name, no
-  // icon) — hide it. Keep it only as a last-resort fallback.
+  // icon) - hide it. Keep it only as a last-resort fallback.
   const announced = wallets.filter((c) => c.id !== "injected");
   const visibleWallets = announced.length > 0 ? announced : wallets;
 
@@ -149,7 +150,7 @@ export function WalletGate({
                 §2
               </span>
               <span>
-                Reputation accrues to your wallet — visible, portable, never
+                Reputation accrues to your wallet: visible, portable, never
                 tied to LinkedIn.
               </span>
             </li>
@@ -283,11 +284,10 @@ function MethodRow({
             {method.isPending ? "…" : method.kind === "embedded" ? "CONTINUE" : "CONNECT"}
           </span>
           <span
-            className="font-mono text-accent transition-transform duration-200 ease-out group-hover:translate-x-2"
-            style={{ fontSize: 13 }}
+            className="text-accent transition-transform duration-200 ease-out group-hover:translate-x-2"
             aria-hidden
           >
-            →
+            <ArrowRight size={14} />
           </span>
         </span>
       </button>

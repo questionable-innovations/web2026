@@ -23,7 +23,7 @@ contract EscrowTest is Test {
 
     function setUp() public {
         impl = new Escrow();
-        factory = new EscrowFactory(address(impl));
+        factory = new EscrowFactory(address(impl), address(0), address(0));
         token = new MockToken();
         alice = vm.createWallet("alice");
         bob = vm.createWallet("bob");

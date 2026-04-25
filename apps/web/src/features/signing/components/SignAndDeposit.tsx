@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArrowRight, Check, CornerDownRight } from "lucide-react";
 import {
   usePublicClient,
   useReadContract,
@@ -213,7 +214,7 @@ function Inner({
       });
 
       // Stamp B's Quick Sign block onto the existing signed PDF (which
-      // carries A's block) and re-pin. On-chain pdfHash is unchanged —
+      // carries A's block) and re-pin. On-chain pdfHash is unchanged -
       // it was always the original; the stamped artifact is the
       // human-readable audit copy (§4.3.7).
       try {
@@ -324,8 +325,15 @@ function Inner({
               placeholder={wholeAmount}
               className="flex-1 bg-transparent text-paper outline-none placeholder:text-ink-faint"
             />
-            <span className="text-ink-muted" style={{ fontSize: 11 }}>
-              {confirmMatches ? "matches ✓" : `must equal ${wholeAmount}`}
+            <span className="inline-flex items-center gap-1 text-ink-muted" style={{ fontSize: 11 }}>
+              {confirmMatches ? (
+                <>
+                  matches
+                  <Check size={12} strokeWidth={2.5} />
+                </>
+              ) : (
+                `must equal ${wholeAmount}`
+              )}
             </span>
           </div>
         </div>
@@ -409,7 +417,7 @@ function Inner({
       >
         <div className="text-left">
           <div className="font-semibold" style={{ fontSize: 14 }}>
-            {stage === "idle" && "Sign & deposit — one transaction"}
+            {stage === "idle" && "Sign & deposit · one transaction"}
             {stage === "approving" && "Approving token…"}
             {stage === "signing" && "Awaiting your signature…"}
             {stage === "submitting" && "Submitting…"}
@@ -422,7 +430,7 @@ function Inner({
             countersign(secret) + safeTransferFrom · atomic
           </div>
         </div>
-        <span>→</span>
+        <ArrowRight size={16} />
       </button>
 
       {error && (
@@ -437,7 +445,8 @@ function Inner({
         className="font-mono text-ink-muted"
         style={{ fontSize: 10, lineHeight: 1.5 }}
       >
-        ↳ Funds release only when both you and{" "}
+        <CornerDownRight size={11} className="inline-block mr-1 align-text-bottom" />
+        Funds release only when both you and{" "}
         {info.partyAName ?? "Party A"} approve. We never custody them.
       </p>
     </div>

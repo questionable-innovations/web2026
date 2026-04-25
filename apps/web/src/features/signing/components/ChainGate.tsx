@@ -5,12 +5,12 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { activeChain } from "@/lib/chain";
 
 /// Render `children` only when the connected wallet is on the deployment
-/// chain. Otherwise show a switch-network panel — without this, users get
+/// chain. Otherwise show a switch-network panel - without this, users get
 /// silent EIP-712 sig failures (the domain separator's chainId won't match)
 /// followed by a separate tx revert.
 ///
 /// We key off `useAccount().chainId` (the *wallet's* connected chain), not
-/// `useChainId()` (wagmi config's "current chain") — they can diverge mid-
+/// `useChainId()` (wagmi config's "current chain") - they can diverge mid-
 /// switch, and the wallet's chain is what actually signs.
 export function ChainGate({ children }: { children: ReactNode }) {
   const { chainId } = useAccount();

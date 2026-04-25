@@ -8,10 +8,13 @@ import { UserMenu } from "@/components/UserMenu";
 export type ContractState =
   | "Draft"
   | "Awaiting B"
+  | "AwaitingCounterparty"
   | "Active"
   | "Releasing"
   | "Released"
-  | "Disputed";
+  | "Closed"
+  | "Disputed"
+  | "Rescued";
 
 export function BrandMark({ size = 22 }: { size?: number }) {
   return (
@@ -29,7 +32,7 @@ export function AppNav({
   active,
   wallet: walletProp,
 }: {
-  active?: "contracts" | "create" | "reputation" | "settings";
+  active?: "contracts" | "create" | "reputation" | "settings" | "admin";
   wallet?: string;
 }) {
   const { address } = useAccount();
@@ -42,7 +45,7 @@ export function AppNav({
       label: "Reputation",
       href: wallet ? `/b/${wallet}` : "/#reputation",
     },
-    { k: "settings", label: "Settings", href: "/settings" },
+    { k: "admin", label: "Admin", href: "/admin" },
   ];
   return (
     <header className="flex items-center justify-between border-b border-rule bg-paper px-7 py-3.5">
@@ -77,10 +80,16 @@ export function AppNav({
 const stateMap: Record<ContractState, { bg: string; fg: string }> = {
   Draft: { bg: "rgba(10,10,10,0.078)", fg: "var(--color-ink)" },
   "Awaiting B": { bg: "var(--color-accent-soft)", fg: "var(--color-accent)" },
+  AwaitingCounterparty: {
+    bg: "var(--color-accent-soft)",
+    fg: "var(--color-accent)",
+  },
   Active: { bg: "var(--color-green-soft)", fg: "var(--color-green)" },
   Releasing: { bg: "var(--color-amber-soft)", fg: "var(--color-amber)" },
   Released: { bg: "var(--color-ink)", fg: "var(--color-paper)" },
+  Closed: { bg: "var(--color-ink)", fg: "var(--color-paper)" },
   Disputed: { bg: "var(--color-accent)", fg: "#fff" },
+  Rescued: { bg: "rgba(10,10,10,0.85)", fg: "#fff" },
 };
 
 export function StateBadge({ state }: { state: string }) {

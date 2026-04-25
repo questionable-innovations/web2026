@@ -4,10 +4,11 @@ import { eq, or, asc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contracts, userProfiles } from "@/server/db/schema";
 import { tierOf, type ValueTier } from "@/features/reputation/lib/tiers";
+import { forwardResolve, looksLikeEnsName, reverseResolve } from "@/lib/ens";
 
 const Wallet = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
 
-// Public reputation endpoint — explicitly excludes anything that would leak a
+// Public reputation endpoint - explicitly excludes anything that would leak a
 // counterparty or raw deal value. See project.md §3.6: counts can be public,
 // raw amounts and counterparties cannot. Per-contract entries here only carry
 // what's safe to show on a public profile (state, sealed-at, banded tier).
@@ -16,11 +17,30 @@ export async function GET(
   ctx: { params: Promise<{ wallet: string }> },
 ) {
   const { wallet: raw } = await ctx.params;
-  const parsed = Wallet.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "bad wallet" }, { status: 400 });
+  const decoded = decodeURIComponent(raw);
+
+  // Accept either a 0x address or an ENS name. ENS names get forward-resolved
+  // against mainnet; reputation aggregation is still keyed on the address so
+  // we don't double-count if a name moves wallets.
+  let wallet: string;
+  let ensFromPath: string | null = null;
+  if (looksLikeEnsName(decoded)) {
+    const resolved = await forwardResolve(decoded);
+    if (!resolved) {
+      return NextResponse.json(
+        { error: `ENS name ${decoded} doesn't resolve` },
+        { status: 404 },
+      );
+    }
+    wallet = resolved.toLowerCase();
+    ensFromPath = decoded.toLowerCase();
+  } else {
+    const parsed = Wallet.safeParse(decoded);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "bad wallet" }, { status: 400 });
+    }
+    wallet = parsed.data.toLowerCase();
   }
-  const wallet = parsed.data.toLowerCase();
 
   const rows = await db
     .select({
@@ -79,7 +99,7 @@ export async function GET(
     } else if (r.state === "Active" || r.state === "Releasing") {
       active++;
     }
-    // Rescued is intentionally counted in neither bucket — matches §4.2.
+    // Rescued is intentionally counted in neither bucket - matches §4.2.
 
     history.push({
       sealedAt: ts,
@@ -96,17 +116,22 @@ export async function GET(
 
   // Display name comes from userProfiles if the wallet has registered one.
   // Email is captured but never returned on the public endpoint.
-  const profile = (
-    await db
+  const [profile, ensName] = await Promise.all([
+    db
       .select({ name: userProfiles.name })
       .from(userProfiles)
       .where(eq(userProfiles.wallet, wallet))
       .limit(1)
-  )[0];
+      .then((rows) => rows[0]),
+    ensFromPath
+      ? Promise.resolve(ensFromPath)
+      : reverseResolve(wallet as `0x${string}`),
+  ]);
 
   return NextResponse.json({
     wallet,
     displayName: profile?.name ?? null,
+    ensName,
     stats: {
       completed,
       disputed,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ArrowDown, ArrowRight, ArrowUpRight, Check } from "lucide-react";
 import { readSecretFromHash } from "@/lib/share-link";
 import { BrandMark, PdfThumb, Seal } from "@/components/AppShell";
 import { SignAndPay } from "./SignAndDeposit";
@@ -75,7 +76,7 @@ export function CounterpartySigning({ escrowAddress }: { escrowAddress: string }
       <Frame>
         <p className="font-mono text-accent" style={{ fontSize: 13 }}>
           This link is missing its access secret. Ask Party A to resend the
-          share link in full — the part after <code>#</code> is required.
+          share link in full; the part after <code>#</code> is required.
         </p>
       </Frame>
     );
@@ -129,7 +130,7 @@ function BLanding({
           className="font-mono uppercase text-muted"
           style={{ fontSize: 10, letterSpacing: 2 }}
         >
-          Addressed to {info.counterpartyEmailMasked ?? "—"}
+          Addressed to {info.counterpartyEmailMasked ?? "-"}
         </span>
       </div>
 
@@ -246,7 +247,10 @@ function BLanding({
               className="bg-ink px-6 py-3.5 text-paper"
               style={{ fontSize: 14 }}
             >
-              Review the document →
+              <span className="inline-flex items-center gap-2">
+                Review the document
+                <ArrowRight size={14} />
+              </span>
             </button>
             <span
               className="font-mono text-muted"
@@ -262,7 +266,7 @@ function BLanding({
             className="mb-3 flex justify-between font-mono uppercase text-muted"
             style={{ fontSize: 10, letterSpacing: 1 }}
           >
-            <span>{info.title} — preview</span>
+            <span>{info.title} · preview</span>
             <span>SHA256 · {info.pdfHash.slice(0, 6)}…{info.pdfHash.slice(-4)}</span>
           </div>
           <PdfThumb height={400} title={info.title} />
@@ -294,9 +298,19 @@ function BSignPay({
           className="flex gap-6 font-mono text-ink-muted"
           style={{ fontSize: 11 }}
         >
-          <span className="text-ink-faint">① REVIEW ✓</span>
-          <span className="text-paper">② SIGN &amp; PAY</span>
-          <span className="text-ink-faint">③ DONE</span>
+          <span className="inline-flex items-center gap-1.5 text-ink-faint">
+            <span>1</span>
+            REVIEW
+            <Check size={12} strokeWidth={2.5} />
+          </span>
+          <span className="text-paper">
+            <span className="mr-1.5">2</span>
+            SIGN &amp; PAY
+          </span>
+          <span className="text-ink-faint">
+            <span className="mr-1.5">3</span>
+            DONE
+          </span>
         </div>
         <span className="font-mono text-ink-muted" style={{ fontSize: 11 }}>
           escrow {info.escrowAddress.slice(0, 6)}…{info.escrowAddress.slice(-4)}
@@ -347,9 +361,20 @@ function BReceipt({ info }: { info: ContractInfo }) {
       <div className="mb-6 flex items-center justify-between">
         <BrandMark />
         <div className="flex gap-6 font-mono" style={{ fontSize: 11 }}>
-          <span className="text-muted">① REVIEW ✓</span>
-          <span className="text-muted">② SIGN &amp; PAY ✓</span>
-          <span className="text-accent">③ DONE</span>
+          <span className="inline-flex items-center gap-1.5 text-muted">
+            <span>1</span>
+            REVIEW
+            <Check size={12} strokeWidth={2.5} />
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-muted">
+            <span>2</span>
+            SIGN &amp; PAY
+            <Check size={12} strokeWidth={2.5} />
+          </span>
+          <span className="text-accent">
+            <span className="mr-1.5">3</span>
+            DONE
+          </span>
         </div>
       </div>
 
@@ -366,7 +391,8 @@ function BReceipt({ info }: { info: ContractInfo }) {
               color: "var(--color-green)",
             }}
           >
-            ✓ Sealed &amp; deposited
+            <Check size={12} strokeWidth={2.5} className="mr-1.5 inline-block" />
+            Sealed &amp; deposited
           </div>
           <h1
             className="mt-3 mb-4 font-serif font-normal"
@@ -390,14 +416,20 @@ function BReceipt({ info }: { info: ContractInfo }) {
               className="bg-ink px-5 py-3.5 text-paper"
               style={{ fontSize: 14 }}
             >
-              Open my contracts →
+              <span className="inline-flex items-center gap-2">
+                Open my contracts
+                <ArrowRight size={14} />
+              </span>
             </a>
             <a
               href={`/c/${info.escrowAddress}/release`}
               className="border border-ink px-5 py-3.5"
               style={{ fontSize: 14 }}
             >
-              Manage release →
+              <span className="inline-flex items-center gap-2">
+                Manage release
+                <ArrowRight size={14} />
+              </span>
             </a>
             <a
               href={`https://testnet.snowtrace.io/address/${info.escrowAddress}`}
@@ -406,7 +438,10 @@ function BReceipt({ info }: { info: ContractInfo }) {
               className="border border-ink px-5 py-3.5"
               style={{ fontSize: 14 }}
             >
-              Verify on Snowtrace ↗
+              <span className="inline-flex items-center gap-2">
+                Verify on Snowtrace
+                <ArrowUpRight size={14} />
+              </span>
             </a>
           </div>
         </div>
@@ -417,7 +452,7 @@ function BReceipt({ info }: { info: ContractInfo }) {
           </div>
           <div className="ds-eyebrow mb-2.5">Receipt · Atomic</div>
           <div className="font-mono" style={{ fontSize: 11, lineHeight: 2 }}>
-            <ReceiptRow k="signed by" v={info.counterpartyName ?? "—"} />
+            <ReceiptRow k="signed by" v={info.counterpartyName ?? "-"} />
             <ReceiptRow
               k="contract"
               v={`${info.escrowAddress.slice(0, 6)}…${info.escrowAddress.slice(-4)}`}
@@ -437,7 +472,7 @@ function BReceipt({ info }: { info: ContractInfo }) {
                 v={`${info.totalDue} ${selectedToken.symbol}`}
               />
             )}
-            <ReceiptRow k="release" v="requires both ✓" />
+            <ReceiptRow k="release" v="requires both signatures" />
           </div>
           <a
             href={`/api/contracts/${info.escrowAddress}/pdf?signed=1`}
@@ -447,11 +482,8 @@ function BReceipt({ info }: { info: ContractInfo }) {
             style={{ fontSize: 13 }}
           >
             <span>Download signed PDF</span>
-            <span
-              className="font-mono text-accent"
-              style={{ fontSize: 11 }}
-            >
-              ↓
+            <span className="text-accent">
+              <ArrowDown size={14} />
             </span>
           </a>
         </div>
@@ -461,7 +493,7 @@ function BReceipt({ info }: { info: ContractInfo }) {
 }
 
 function formatExpiry(deadlineSecs: number | null): string {
-  if (!deadlineSecs) return "—";
+  if (!deadlineSecs) return "-";
   const days = Math.round((deadlineSecs * 1000 - Date.now()) / 86_400_000);
   if (days <= 0) return "expired";
   if (days === 1) return "tomorrow";

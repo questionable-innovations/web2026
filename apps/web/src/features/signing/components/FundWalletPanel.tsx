@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowUpRight, AlertTriangle, Check, RefreshCw } from "lucide-react";
 import { formatUnits } from "viem";
 import { useBalance, useReadContract } from "wagmi";
 import { activeChain } from "@/lib/chain";
@@ -65,10 +66,11 @@ export function FundWalletPanel({
     <div className="border border-accent bg-ink-card p-5">
       <div className="flex items-baseline justify-between">
         <div
-          className="font-mono uppercase text-accent"
+          className="inline-flex items-center gap-1.5 font-mono uppercase text-accent"
           style={{ fontSize: 10, letterSpacing: 2 }}
         >
-          ⚠ Top up to deposit
+          <AlertTriangle size={12} strokeWidth={2.2} />
+          Top up to deposit
         </div>
         <span
           className="font-mono uppercase text-ink-muted"
@@ -109,7 +111,7 @@ export function FundWalletPanel({
           copyValue={tokenAddress}
           copied={copied === "token"}
           onCopy={() => copy(tokenAddress, "token")}
-          hint="Add to wallet → Import token"
+          hint="Add to wallet, then Import token"
         />
       </div>
 
@@ -124,16 +126,23 @@ export function FundWalletPanel({
           className="font-mono text-ink-muted"
           style={{ fontSize: 10 }}
         >
-          Once funds arrive, hit refresh — the deposit button unlocks.
+          Once funds arrive, hit refresh; the deposit button unlocks.
         </span>
         <button
           type="button"
           onClick={refresh}
           disabled={refreshing}
-          className="border border-ink-rule px-3.5 py-2 font-mono uppercase text-paper transition-colors hover:bg-ink-rule-soft disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 border border-ink-rule px-3.5 py-2 font-mono uppercase text-paper transition-colors hover:bg-ink-rule-soft disabled:opacity-60"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
-          {refreshing ? "Checking…" : "Refresh balance ↻"}
+          {refreshing ? (
+            "Checking…"
+          ) : (
+            <>
+              Refresh balance
+              <RefreshCw size={11} strokeWidth={2} />
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -170,7 +179,14 @@ function FundRow({
           className="font-mono uppercase text-accent"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
-          {copied ? "Copied ✓" : "Copy"}
+          {copied ? (
+            <span className="inline-flex items-center gap-1">
+              Copied
+              <Check size={10} strokeWidth={2.5} />
+            </span>
+          ) : (
+            "Copy"
+          )}
         </button>
       </div>
       <code
@@ -208,7 +224,7 @@ function TestnetFunding({
       />
       <FundLink
         title={`Get test ${symbol}`}
-        subtitle="Ask the team — request test tokens in Discord"
+        subtitle="Ask the team; request test tokens in Discord"
         href="https://faucet.avax.network/"
       />
     </div>
@@ -225,7 +241,7 @@ function MainnetFunding({ symbol }: { symbol: string }) {
       />
       <FundLink
         title="On-ramp AVAX"
-        subtitle="Card → wallet via MoonPay"
+        subtitle="Card to wallet via MoonPay"
         href="https://buy.moonpay.com/?defaultCurrencyCode=avax"
       />
     </div>
@@ -264,10 +280,9 @@ function FundLink({
       </span>
       <span
         aria-hidden
-        className="font-mono text-accent transition-transform group-hover:translate-x-0.5"
-        style={{ fontSize: 13 }}
+        className="text-accent transition-transform group-hover:translate-x-0.5"
       >
-        ↗
+        <ArrowUpRight size={14} />
       </span>
     </a>
   );

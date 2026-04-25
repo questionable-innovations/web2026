@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
 import {
   useAccount,
   useBalance,
@@ -12,6 +13,7 @@ import { formatUnits } from "viem";
 import { usePrivy } from "@privy-io/react-auth";
 import { activeChain, depositToken } from "@/lib/chain";
 import { erc20Abi } from "@/lib/contracts/abis";
+import { useEnsName, shortAddress } from "@/lib/ens-client";
 
 type Profile = { wallet: string; name: string; email: string };
 
@@ -79,7 +81,9 @@ export function UserMenu() {
 
   const privyEmail = privy?.user?.email?.address ?? null;
   const privyGoogle = privy?.user?.google ?? null;
-  const displayName = profile?.name ?? privyGoogle?.name ?? null;
+  const ensName = useEnsName(address ?? null);
+  const displayName =
+    profile?.name ?? privyGoogle?.name ?? ensName ?? null;
   const displayEmail = profile?.email ?? privyEmail ?? privyGoogle?.email ?? null;
 
   const initial = useMemo(() => {
@@ -93,10 +97,11 @@ export function UserMenu() {
     return (
       <a
         href="/new"
-        className="bg-ink px-4 py-2.5 text-[13px] text-paper"
+        className="inline-flex items-center gap-2 bg-ink px-4 py-2.5 text-[13px] text-paper"
         style={{ letterSpacing: 0.3 }}
       >
-        Sign in →
+        Sign in
+        <ArrowRight size={14} />
       </a>
     );
   }
@@ -118,7 +123,11 @@ export function UserMenu() {
     setOpen(false);
   }
 
-  const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
+  const short = shortAddress(address);
+  // The button shows the most-prominent identity at a glance: profile name if
+  // they've registered one, else ENS, else the truncated 0x. The popover row
+  // below shows the next layer of detail (ensName + short, or just short).
+  const subtitle = ensName && profile?.name ? ensName : short;
 
   return (
     <div ref={ref} className="relative">
@@ -143,15 +152,11 @@ export function UserMenu() {
             className="font-mono text-muted"
             style={{ fontSize: 10, letterSpacing: 0.3 }}
           >
-            {short}
+            {subtitle}
           </span>
         </span>
-        <span
-          aria-hidden
-          className="font-mono text-muted"
-          style={{ fontSize: 10 }}
-        >
-          {open ? "▴" : "▾"}
+        <span aria-hidden className="text-muted">
+          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </span>
       </button>
 
@@ -180,10 +185,11 @@ export function UserMenu() {
                 <Link
                   href="/settings"
                   onClick={() => setOpen(false)}
-                  className="mt-1 inline-block font-mono uppercase text-accent"
+                  className="mt-1 inline-flex items-center gap-1 font-mono uppercase text-accent"
                   style={{ fontSize: 9, letterSpacing: 1 }}
                 >
-                  Add name & email →
+                  Add name & email
+                  <ArrowRight size={10} />
                 </Link>
               )}
             </div>
@@ -191,7 +197,7 @@ export function UserMenu() {
 
           <div className="px-4 pt-3 pb-3">
             <div className="ds-eyebrow mb-1.5 flex items-center justify-between">
-              <span>Wallet</span>
+              <span>Wallet{ensName ? ` · ${ensName}` : ""}</span>
               <span className="text-muted" style={{ letterSpacing: 1 }}>
                 {activeChain.name}
               </span>
@@ -238,14 +244,20 @@ export function UserMenu() {
             <MenuLink href="/contracts" onClick={() => setOpen(false)}>
               My contracts
             </MenuLink>
-            <MenuLink href={`/b/${address}`} onClick={() => setOpen(false)}>
+            <MenuLink
+              href={`/b/${ensName ? encodeURIComponent(ensName) : address}`}
+              onClick={() => setOpen(false)}
+            >
               My reputation
             </MenuLink>
             <MenuLink
               href={`https://testnet.snowtrace.io/address/${address}`}
               external
             >
-              View on Snowtrace ↗
+              <span className="inline-flex items-center gap-1.5">
+                View on Snowtrace
+                <ArrowUpRight size={12} />
+              </span>
             </MenuLink>
             <MenuLink href="/settings" onClick={() => setOpen(false)}>
               Settings
@@ -307,7 +319,7 @@ function BalanceCell({ label, value }: { label: string; value: string | null }) 
         style={{ fontSize: 18, lineHeight: 1.15 }}
         title={value ?? undefined}
       >
-        {value !== null ? formatBalance(value) : "—"}
+        {value !== null ? formatBalance(value) : "-"}
       </div>
     </div>
   );

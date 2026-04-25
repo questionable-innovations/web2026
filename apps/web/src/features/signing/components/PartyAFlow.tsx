@@ -2,6 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CornerDownRight,
+} from "lucide-react";
+import {
   useAccount,
   usePublicClient,
   useSignTypedData,
@@ -33,7 +40,7 @@ import { ProfileGate, type Profile } from "./ProfileGate";
 import { PdfThumb, StateBadge } from "@/components/AppShell";
 
 /// Default URL-link validity. Decoupled from the deal deadline because the
-/// link is a bearer secret — keeping it valid for the full deal length
+/// link is a bearer secret - keeping it valid for the full deal length
 /// extends the phishing window unnecessarily. Counterparty has 7 days from
 /// the sender pressing "share" to countersign; if they miss it, partyA
 /// re-issues a link.
@@ -71,13 +78,13 @@ const STEPS: [string, Stage[]][] = [
 ];
 
 /// Wallet-first entry point. Anyone uploading a PDF must first prove they
-/// hold a wallet — that wallet becomes Party A's identity, the EIP-712
+/// hold a wallet - that wallet becomes Party A's identity, the EIP-712
 /// signer, and the address reputation accrues to.
 export function PartyAFlow() {
   return (
     <WalletGate
       title="Sign in to seal a deal"
-      blurb="DealSeal is wallet-first. Connect a wallet to upload your PDF — your signature, your deposit terms, and your reputation all anchor to it."
+      blurb="DealSeal is wallet-first. Connect a wallet to upload your PDF; your signature, your deposit terms, and your reputation all anchor to it."
     >
       {(address) => (
         <ProfileGate wallet={address}>
@@ -106,7 +113,7 @@ function Inner({
 
   const headerEyebrow =
     stage === "share"
-      ? `Services agreement — ${details?.counterpartyName ?? "Counterparty"}`
+      ? `Services agreement: ${details?.counterpartyName ?? "Counterparty"}`
       : "New contract · Draft";
   const headline =
     stage === "details"
@@ -119,11 +126,8 @@ function Inner({
     <div>
       <div className="mb-6 flex items-center justify-between border border-rule bg-card px-5 py-3">
         <div className="flex items-center gap-3">
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-ink font-serif text-paper"
-            style={{ fontSize: 12 }}
-          >
-            ✓
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-paper">
+            <Check size={14} strokeWidth={2.2} />
           </span>
           <div>
             <div className="ds-eyebrow">Signed in as</div>
@@ -257,7 +261,7 @@ function Steps({ current }: { current: Stage }) {
                     }`,
               }}
             >
-              {isDone ? "✓" : i + 1}
+              {isDone ? <Check size={10} strokeWidth={2.5} /> : i + 1}
             </span>
             {label}
           </span>
@@ -417,7 +421,7 @@ function DetailsStep({
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Services Agreement — Acme × QInnovate"
+            placeholder="Services Agreement - Acme × QInnovate"
             className="ds-input"
           />
         </div>
@@ -543,20 +547,22 @@ function DetailsStep({
             lineHeight: 1.5,
           }}
         >
-          <span className="text-accent">↳</span> Funds release only when both
-          wallets approve. Neither side can withdraw alone.
+          <CornerDownRight size={12} className="text-accent inline-block mr-1 align-text-bottom" />
+          Funds release only when both wallets approve. Neither side can withdraw alone.
         </div>
 
         <div className="mt-7 flex justify-between border-t border-rule-soft pt-6">
-          <span className="border border-rule px-4 py-3 text-[13px] text-muted">
-            ← Back to document
+          <span className="inline-flex items-center gap-2 border border-rule px-4 py-3 text-[13px] text-muted">
+            <ArrowLeft size={14} />
+            Back to document
           </span>
           <button
             type="submit"
             disabled={!file}
-            className="bg-ink px-5 py-3 text-[13px] text-paper disabled:opacity-50"
+            className="inline-flex items-center gap-2 bg-ink px-5 py-3 text-[13px] text-paper disabled:opacity-50"
           >
-            Continue to sign →
+            Continue to sign
+            <ArrowRight size={14} />
           </button>
         </div>
       </div>
@@ -596,7 +602,7 @@ function DetailsStep({
           >
             <div>pdfHash &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; computed on next step</div>
             <div>token &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {selectedToken.symbol}</div>
-            <div>amount &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {amount || "—"}</div>
+            <div>amount &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {amount || "-"}</div>
             <div>partyA &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; you</div>
             <div>
               secret &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{" "}
@@ -707,10 +713,11 @@ function SignStep({
           type="button"
           disabled={stage !== "sign"}
           onClick={() => setStage("details")}
-          className="w-full border border-rule px-5 py-3 text-ink disabled:opacity-50"
+          className="inline-flex w-full items-center justify-center gap-2 border border-rule px-5 py-3 text-ink disabled:opacity-50"
           style={{ fontSize: 13 }}
         >
-          ← Back to details
+          <ArrowLeft size={14} />
+          Back to details
         </button>
 
         <button
@@ -776,7 +783,7 @@ function SignStep({
               );
               const validUntil =
                 linkExpiry < dealDeadline ? linkExpiry : dealDeadline;
-              // Read decimals from chain — env-derived decimals risk an
+              // Read decimals from chain - env-derived decimals risk an
               // off-by-10^n bug if misconfigured.
               const decimals = (await publicClient.readContract({
                 address: details.depositToken.address,
@@ -821,6 +828,7 @@ function SignStep({
                   counterpartyName: details.counterpartyName,
                   amount: details.amount,
                   depositToken: details.depositToken.address,
+                  totalDue: details.totalDue || undefined,
                   pdfHash,
                   pdfCid: cid,
                   escrowAddress: predicted,
@@ -908,8 +916,8 @@ function SignStep({
           className="font-mono text-muted"
           style={{ fontSize: 11, lineHeight: 1.5 }}
         >
-          ↳ Funds release only when both wallets approve. We never custody
-          them.
+          <CornerDownRight size={12} className="inline-block mr-1 align-text-bottom" />
+          Funds release only when both wallets approve. We never custody them.
         </p>
       </div>
     </div>
@@ -976,8 +984,9 @@ function ShareStep({
           style={{ fontSize: 11, letterSpacing: 1 }}
         >
           <span>SIGNED · {new Date().toISOString().slice(0, 10)}</span>
-          <span style={{ color: "var(--color-green)" }}>
-            ✓ ATTESTATION ON-CHAIN
+          <span className="inline-flex items-center gap-1.5" style={{ color: "var(--color-green)" }}>
+            <Check size={12} strokeWidth={2.5} />
+            ATTESTATION ON-CHAIN
           </span>
         </div>
         <div className="px-8 py-6">
@@ -991,7 +1000,7 @@ function ShareStep({
                 className="font-mono uppercase text-muted"
                 style={{ fontSize: 10, letterSpacing: 1 }}
               >
-                Signature — Party A
+                Signature - Party A
               </div>
               <svg
                 width="200"
@@ -1008,11 +1017,8 @@ function ShareStep({
                 />
               </svg>
             </div>
-            <span
-              className="font-mono"
-              style={{ fontSize: 11, color: "var(--color-green)" }}
-            >
-              ✓
+            <span style={{ color: "var(--color-green)" }}>
+              <Check size={14} strokeWidth={2.5} />
             </span>
           </div>
         </div>
@@ -1058,7 +1064,7 @@ function ShareStep({
             className="mt-2 font-mono text-muted"
             style={{ fontSize: 10, lineHeight: 1.5 }}
           >
-            The secret lives in the URL fragment — never sent to our server,
+            The secret lives in the URL fragment - never sent to our server,
             never indexed.
           </div>
 
@@ -1070,10 +1076,11 @@ function ShareStep({
               Email {details.counterpartyName.split(" ")[0]} the link
             </span>
             <span
-              className="font-mono text-accent"
+              className="inline-flex items-center gap-1.5 font-mono text-accent"
               style={{ fontSize: 11 }}
             >
-              SEND →
+              SEND
+              <ArrowRight size={12} />
             </span>
           </a>
         </div>
@@ -1105,11 +1112,8 @@ function ShareStep({
             style={{ fontSize: 12 }}
           >
             <span>View signed PDF</span>
-            <span
-              className="font-mono text-accent"
-              style={{ fontSize: 10 }}
-            >
-              ↓
+            <span className="text-accent">
+              <ArrowDown size={14} />
             </span>
           </a>
         </div>

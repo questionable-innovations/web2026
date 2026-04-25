@@ -33,7 +33,7 @@ export type AttestationInput = {
   nameSalt: `0x${string}`;
   emailSalt: `0x${string}`;
   pdfHash: `0x${string}`;
-  /// On-chain `nonces[signer]` — 0 for first sign by that wallet on that escrow.
+  /// On-chain `nonces[signer]` - 0 for first sign by that wallet on that escrow.
   nonce?: bigint;
   /// Unix seconds. Sig is rejected after this (defense-in-depth).
   deadlineSecs?: bigint;

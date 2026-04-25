@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ReactNode } from "react";
+import { ArrowRight, CornerDownRight } from "lucide-react";
 import { SignPayHero } from "@/components/SignPayHero";
 import { StateMachine } from "@/components/StateMachine";
 import { activeChain, depositToken } from "@/lib/chain";
@@ -50,10 +51,11 @@ function TopBar() {
       <div className="flex items-center gap-3">
         <Link
           href="/new"
-          className="bg-ink px-4 py-2.5 text-[13px] text-paper"
+          className="inline-flex items-center gap-2 bg-ink px-4 py-2.5 text-[13px] text-paper"
           style={{ letterSpacing: 0.3 }}
         >
-          Sign in →
+          Sign in
+          <ArrowRight size={14} />
         </Link>
       </div>
     </header>
@@ -131,10 +133,11 @@ function Hero() {
           <div className="mt-9 flex gap-3">
             <Link
               href="/new"
-              className="bg-ink px-6 py-3.5 text-paper"
+              className="inline-flex items-center gap-2 bg-ink px-6 py-3.5 text-paper"
               style={{ fontSize: 14, letterSpacing: 0.3 }}
             >
-              Seal your first contract →
+              Seal your first contract
+              <ArrowRight size={14} />
             </Link>
             <a
               href="#how-it-works"
@@ -159,7 +162,7 @@ function Hero() {
             className="mt-3.5 flex justify-between font-mono uppercase text-muted"
             style={{ fontSize: 10, letterSpacing: 1 }}
           >
-            <span>Fig. 1 — Sign + deposit, atomic</span>
+            <span>Fig. 1 · Sign + deposit, atomic</span>
             <span>Live</span>
           </div>
         </div>
@@ -213,7 +216,7 @@ function KnowYoureBeingPaid() {
             style={{ fontSize: 15 }}
           >
             The deposit isn&apos;t a promise. Once Party B countersigns, the
-            deposit is already in escrow in that same transaction — verifiable,
+            deposit is already in escrow in that same transaction: verifiable,
             on-chain, before the work starts.
           </p>
         </div>
@@ -253,10 +256,11 @@ function KnowYoureBeingPaid() {
               {c.d}
             </div>
             <div
-              className="border-t border-dashed border-rule pt-3.5 font-mono text-accent"
+              className="inline-flex items-center gap-1.5 border-t border-dashed border-rule pt-3.5 font-mono text-accent"
               style={{ fontSize: 10, letterSpacing: 0.5 }}
             >
-              ↳ {c.meta}
+              <CornerDownRight size={11} />
+              {c.meta}
             </div>
           </div>
         ))}
@@ -452,7 +456,7 @@ function StateMachineSection() {
         className="mt-6 flex flex-wrap gap-8 font-mono uppercase text-muted"
         style={{ fontSize: 10, letterSpacing: 1 }}
       >
-        <span>Fig. 2 — Escrow lifecycle</span>
+        <span>Fig. 2 · Escrow lifecycle</span>
         <span>EIP-1167 minimal proxy</span>
         <span>·</span>
         <span>Closed after withdraw · rescue after timeout</span>
@@ -617,10 +621,11 @@ function ClosingCTA() {
           <div className="mt-10 flex flex-wrap gap-3.5">
             <Link
               href="/new"
-              className="bg-accent px-7 py-4 text-white"
+              className="inline-flex items-center gap-2 bg-accent px-7 py-4 text-white"
               style={{ fontSize: 15, letterSpacing: 0.3 }}
             >
-              Sign in &amp; upload your PDF →
+              Sign in &amp; upload your PDF
+              <ArrowRight size={16} />
             </Link>
             <Link
               href="/contracts"

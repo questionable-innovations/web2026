@@ -111,7 +111,7 @@ export function SignPayHero() {
         ))}
         <div style={{ height: 18 }} />
         <div style={{ fontSize: 8, color: muted, letterSpacing: 0.4, textTransform: "uppercase" }}>
-          Signature — Party A
+          Signature - Party A
         </div>
         <svg width="100%" height="44" viewBox="0 0 200 44" style={{ marginTop: 4 }}>
           <path

@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import {
   TIER_LABEL,
   TIER_NAME,
   type ValueTier,
 } from "@/features/reputation/lib/tiers";
+import { pickAddressLabel, shortAddress } from "@/lib/ens-client";
+import {
+  EnsProfileCard,
+  type EnsProfile,
+} from "@/features/reputation/components/EnsProfileCard";
 
 type Stats = {
   completed: number;
@@ -27,6 +33,7 @@ type HistoryEntry = {
 type Reputation = {
   wallet: string;
   displayName: string | null;
+  ensName: string | null;
   stats: Stats;
   history: HistoryEntry[];
 };
@@ -35,12 +42,14 @@ export function ReputationCard({ wallet }: { wallet: string }) {
   const [data, setData] = useState<Reputation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ensProfile, setEnsProfile] = useState<EnsProfile | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/reputation/${wallet}`)
+    setEnsProfile(null);
+    fetch(`/api/reputation/${encodeURIComponent(wallet)}`)
       .then(async (r) => {
         if (!r.ok) {
           throw new Error((await r.json()).error ?? `HTTP ${r.status}`);
@@ -51,6 +60,18 @@ export function ReputationCard({ wallet }: { wallet: string }) {
         if (cancelled) return;
         setData(d);
         setLoading(false);
+        // Lazily fetch the ENS profile (avatar + text records) only after the
+        // reputation core has rendered, so the page paints fast even if
+        // mainnet RPC is slow. Best-effort - no spinner, no error UI.
+        if (d.ensName) {
+          fetch(`/api/ens?name=${encodeURIComponent(d.ensName)}&profile=1`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((p: { profile: EnsProfile | null } | null) => {
+              if (cancelled || !p?.profile) return;
+              setEnsProfile(p.profile);
+            })
+            .catch(() => {});
+        }
       })
       .catch((e: Error) => {
         if (cancelled) return;
@@ -62,7 +83,10 @@ export function ReputationCard({ wallet }: { wallet: string }) {
     };
   }, [wallet]);
 
-  const short = `${wallet.slice(0, 6)}…${wallet.slice(-4)}`;
+  // The `wallet` prop may be an ENS name (e.g. `dealseal.eth`) when the URL
+  // was `/b/<name>` - only truncate when it's an actual 0x address.
+  const isHexAddress = /^0x[0-9a-fA-F]{40}$/.test(wallet);
+  const short = isHexAddress ? shortAddress(wallet) : wallet;
 
   if (loading) {
     return (
@@ -81,29 +105,68 @@ export function ReputationCard({ wallet }: { wallet: string }) {
           Couldn&apos;t load profile for {short}.
         </div>
         <div className="mt-2 text-sm text-muted">{error}</div>
-        <Link href="/b" className="mt-6 inline-block font-mono text-accent" style={{ fontSize: 12, letterSpacing: 0.5 }}>
-          ← Back to directory
+        <Link href="/b" className="mt-6 inline-flex items-center gap-1.5 font-mono text-accent" style={{ fontSize: 12, letterSpacing: 0.5 }}>
+          <ArrowLeft size={12} />
+          Back to directory
         </Link>
       </div>
     );
   }
 
-  const { stats, history, displayName } = data;
+  const { stats, history, displayName, ensName } = data;
   const firstSeenLabel = stats.firstSeen
     ? new Date(stats.firstSeen * 1000).toISOString().slice(0, 10)
-    : "—";
+    : "-";
   const tierName = TIER_NAME[stats.valueTier];
+  const headline = pickAddressLabel({
+    profileName: displayName,
+    ensName,
+    address: data.wallet,
+  });
+  const breadcrumb = ensName ?? short;
 
   return (
     <div className="px-16 py-7">
       <div className="mb-7 flex justify-end">
         <Link
           href="/b"
-          className="font-mono uppercase text-muted hover:text-ink"
+          className="inline-flex items-center gap-1.5 font-mono uppercase text-muted hover:text-ink"
           style={{ fontSize: 10, letterSpacing: 2 }}
         >
-          ← Directory · /b/{short}
+          <ArrowLeft size={11} />
+          Directory · /b/{breadcrumb}
         </Link>
+      </div>
+
+      <div className="mb-8">
+        <div
+          className="font-mono uppercase text-accent"
+          style={{ fontSize: 11, letterSpacing: 2 }}
+        >
+          Tier · {tierName}
+          {ensName && (
+            <>
+              {" · "}
+              <span className="text-ink">{ensName}</span>
+            </>
+          )}
+        </div>
+        <h1
+          className="my-3 font-serif font-normal"
+          style={{ fontSize: 72, lineHeight: 1.02, letterSpacing: -2 }}
+        >
+          {headline}
+        </h1>
+        <div
+          className="font-mono text-muted"
+          style={{ fontSize: 12, letterSpacing: 0.4 }}
+        >
+          {wallet}
+        </div>
+        <div className="mt-2 text-base text-muted">
+          First seen {firstSeenLabel} · Banded value tier{" "}
+          {TIER_LABEL[stats.valueTier]}
+        </div>
       </div>
 
       <div
@@ -112,26 +175,7 @@ export function ReputationCard({ wallet }: { wallet: string }) {
       >
         <div>
           <div
-            className="font-mono uppercase text-accent"
-            style={{ fontSize: 11, letterSpacing: 2 }}
-          >
-            Tier · {tierName}
-          </div>
-          <h1
-            className="my-3 font-serif font-normal"
-            style={{ fontSize: 72, lineHeight: 1.02, letterSpacing: -2 }}
-          >
-            {displayName ?? short}
-          </h1>
-          <div className="font-mono text-muted" style={{ fontSize: 12, letterSpacing: 0.4 }}>
-            {wallet}
-          </div>
-          <div className="mt-2 text-base text-muted">
-            First seen {firstSeenLabel} · Banded value tier {TIER_LABEL[stats.valueTier]}
-          </div>
-
-          <div
-            className="mt-8 grid grid-cols-3 border border-rule"
+            className="grid grid-cols-3 border border-rule"
             style={{ gap: 1, background: "var(--color-rule)" }}
           >
             {[
@@ -201,7 +245,8 @@ export function ReputationCard({ wallet }: { wallet: string }) {
           </div>
         </div>
 
-        <div>
+        <div className="flex flex-col gap-6">
+          {ensProfile && <EnsProfileCard profile={ensProfile} variant="compact" />}
           <div className="border border-rule bg-card p-6">
             <div
               className="mb-4 flex items-baseline justify-between"

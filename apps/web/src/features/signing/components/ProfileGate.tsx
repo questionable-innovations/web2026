@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { EmailVerify } from "./EmailVerify";
 
 export type Profile = {
@@ -116,7 +117,7 @@ function Onboarding({
           className="font-serif font-normal"
           style={{ fontSize: 38, lineHeight: 1.1, letterSpacing: -0.7 }}
         >
-          Let&apos;s get your details — once.
+          Let&apos;s get your details, once.
         </h2>
         <p
           className="mt-3 max-w-md leading-relaxed text-ink/70"
@@ -175,9 +176,16 @@ function Onboarding({
             type="button"
             disabled={!ready || saving}
             onClick={save}
-            className="bg-ink px-5 py-3 text-[13px] text-paper disabled:opacity-50"
+            className="inline-flex items-center gap-2 bg-ink px-5 py-3 text-[13px] text-paper disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Save & continue →"}
+            {saving ? (
+              "Saving…"
+            ) : (
+              <>
+                Save & continue
+                <ArrowRight size={14} />
+              </>
+            )}
           </button>
         </div>
 
@@ -198,7 +206,7 @@ function Onboarding({
             className="list-disc pl-5 leading-relaxed text-ink/75"
             style={{ fontSize: 14 }}
           >
-            <li>One-time setup — every future contract reuses this.</li>
+            <li>One-time setup; every future contract reuses this.</li>
             <li>Your email proves identity in disputes; your wallet proves intent.</li>
             <li>Edit any time from <strong>Settings</strong>.</li>
           </ul>

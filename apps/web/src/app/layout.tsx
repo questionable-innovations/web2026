@@ -26,7 +26,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DealSeal — sign the contract, pay the deposit, in one tap.",
+  title: "DealSeal. Sign the contract, pay the deposit, in one tap.",
   description: "DocuSign for web3: the signature is the money.",
 };
 

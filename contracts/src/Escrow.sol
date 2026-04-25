@@ -4,8 +4,7 @@ pragma solidity ^0.8.27;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import {ReentrancyGuardUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EIP712Upgradeable} from
     "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
@@ -25,7 +24,7 @@ interface IPool {
 /// @notice State machine for sign + deposit + release. Deadlock by design (§3.4).
 /// No admin, no upgrade — the implementation behind the clones is immutable.
 /// Token is set at init and is `immutable` by convention (cannot be changed).
-contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable {
+contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
     using SafeERC20 for IERC20;
 
     enum State {
@@ -136,7 +135,6 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         if (_deadline <= block.timestamp) revert InvalidInit();
         if (_validUntil == 0 || _validUntil > _deadline) revert InvalidInit();
 
-        __ReentrancyGuard_init();
         __EIP712_init("DealSeal", "1");
 
         factory = msg.sender;

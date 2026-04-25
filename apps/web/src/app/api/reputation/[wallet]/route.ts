@@ -1,0 +1,121 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { eq, or, asc } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { contracts, userProfiles } from "@/server/db/schema";
+import { tierOf, type ValueTier } from "@/features/reputation/lib/tiers";
+
+const Wallet = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
+
+// Public reputation endpoint — explicitly excludes anything that would leak a
+// counterparty or raw deal value. See project.md §3.6: counts can be public,
+// raw amounts and counterparties cannot. Per-contract entries here only carry
+// what's safe to show on a public profile (state, sealed-at, banded tier).
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ wallet: string }> },
+) {
+  const { wallet: raw } = await ctx.params;
+  const parsed = Wallet.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "bad wallet" }, { status: 400 });
+  }
+  const wallet = parsed.data.toLowerCase();
+
+  const rows = await db
+    .select({
+      state: contracts.state,
+      depositAmount: contracts.depositAmount,
+      createdAt: contracts.createdAt,
+      partyAWallet: contracts.partyAWallet,
+      partyBWallet: contracts.partyBWallet,
+    })
+    .from(contracts)
+    .where(
+      or(eq(contracts.partyAWallet, wallet), eq(contracts.partyBWallet, wallet)),
+    )
+    .orderBy(asc(contracts.createdAt));
+
+  let completed = 0;
+  let disputed = 0;
+  let active = 0;
+  let completedValueNzd = 0;
+  let firstSeen: Date | null = null;
+
+  type PublicEntry = {
+    sealedAt: number; // unix seconds
+    state: string;
+    role: "issuer" | "counterparty";
+    valueTier: ValueTier;
+  };
+  const history: PublicEntry[] = [];
+
+  for (const r of rows) {
+    const amount = Number(r.depositAmount || 0);
+    const ts =
+      r.createdAt instanceof Date
+        ? Math.floor(r.createdAt.getTime() / 1000)
+        : Number(r.createdAt);
+
+    const isPostCountersign =
+      r.state === "Active" ||
+      r.state === "Releasing" ||
+      r.state === "Released" ||
+      r.state === "Closed" ||
+      r.state === "Disputed" ||
+      r.state === "Rescued";
+    if (!isPostCountersign) continue;
+
+    if (firstSeen === null || (r.createdAt as Date) < firstSeen) {
+      firstSeen =
+        r.createdAt instanceof Date ? r.createdAt : new Date(ts * 1000);
+    }
+
+    if (r.state === "Released" || r.state === "Closed") {
+      completed++;
+      completedValueNzd += amount;
+    } else if (r.state === "Disputed") {
+      disputed++;
+    } else if (r.state === "Active" || r.state === "Releasing") {
+      active++;
+    }
+    // Rescued is intentionally counted in neither bucket — matches §4.2.
+
+    history.push({
+      sealedAt: ts,
+      state: r.state,
+      role:
+        r.partyAWallet.toLowerCase() === wallet ? "issuer" : "counterparty",
+      valueTier: tierOf(amount),
+    });
+  }
+
+  const totalCounted = completed + disputed;
+  const disputeRate =
+    totalCounted === 0 ? 0 : Math.round((disputed / totalCounted) * 1000) / 10;
+
+  // Display name comes from userProfiles if the wallet has registered one.
+  // Email is captured but never returned on the public endpoint.
+  const profile = (
+    await db
+      .select({ name: userProfiles.name })
+      .from(userProfiles)
+      .where(eq(userProfiles.wallet, wallet))
+      .limit(1)
+  )[0];
+
+  return NextResponse.json({
+    wallet,
+    displayName: profile?.name ?? null,
+    stats: {
+      completed,
+      disputed,
+      active,
+      disputeRate, // percentage, one decimal
+      valueTier: tierOf(completedValueNzd),
+      firstSeen: firstSeen ? Math.floor(firstSeen.getTime() / 1000) : null,
+    },
+    // Newest first for display.
+    history: history.sort((a, b) => b.sealedAt - a.sealedAt),
+  });
+}

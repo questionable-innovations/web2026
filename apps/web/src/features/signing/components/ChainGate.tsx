@@ -52,7 +52,7 @@ export function ChainGate({ children }: { children: ReactNode }) {
           className="mt-3 font-mono text-accent"
           style={{ fontSize: 11 }}
         >
-          {error.message}
+          An error occurred.
         </p>
       )}
     </div>

@@ -1,38 +1,109 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  TIER_LABEL,
+  TIER_NAME,
+  type ValueTier,
+} from "@/features/reputation/lib/tiers";
+
 type Stats = {
   completed: number;
   disputed: number;
-  disputeRate: string;
-  firstSeen: string;
+  active: number;
+  disputeRate: number;
+  valueTier: ValueTier;
+  firstSeen: number | null;
+};
+
+type HistoryEntry = {
+  sealedAt: number;
+  state: string;
+  role: "issuer" | "counterparty";
+  valueTier: ValueTier;
+};
+
+type Reputation = {
+  wallet: string;
+  displayName: string | null;
+  stats: Stats;
+  history: HistoryEntry[];
 };
 
 export function ReputationCard({ wallet }: { wallet: string }) {
-  // TODO: read from ReputationView contract via viem.
-  const stats: Stats = {
-    completed: 14,
-    disputed: 0,
-    disputeRate: "0.0%",
-    firstSeen: "2025-08-14",
-  };
+  const [data, setData] = useState<Reputation | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 18-month activity histogram, placeholder until ReputationView is wired.
-  const activity = [1, 0, 1, 2, 1, 1, 0, 1, 2, 1, 0, 1, 1, 2, 0, 1, 1, 2];
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/reputation/${wallet}`)
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error((await r.json()).error ?? `HTTP ${r.status}`);
+        }
+        return r.json();
+      })
+      .then((d: Reputation) => {
+        if (cancelled) return;
+        setData(d);
+        setLoading(false);
+      })
+      .catch((e: Error) => {
+        if (cancelled) return;
+        setError(e.message);
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wallet]);
+
   const short = `${wallet.slice(0, 6)}…${wallet.slice(-4)}`;
+
+  if (loading) {
+    return (
+      <div className="px-16 py-10 text-sm text-muted">
+        Loading reputation for {short}…
+      </div>
+    );
+  }
+  if (error || !data) {
+    return (
+      <div className="px-16 py-10">
+        <div className="mb-3 font-mono uppercase text-accent" style={{ fontSize: 11, letterSpacing: 2 }}>
+          Lookup failed
+        </div>
+        <div className="font-serif" style={{ fontSize: 28 }}>
+          Couldn&apos;t load profile for {short}.
+        </div>
+        <div className="mt-2 text-sm text-muted">{error}</div>
+        <Link href="/b" className="mt-6 inline-block font-mono text-accent" style={{ fontSize: 12, letterSpacing: 0.5 }}>
+          ← Back to directory
+        </Link>
+      </div>
+    );
+  }
+
+  const { stats, history, displayName } = data;
+  const firstSeenLabel = stats.firstSeen
+    ? new Date(stats.firstSeen * 1000).toISOString().slice(0, 10)
+    : "—";
+  const tierName = TIER_NAME[stats.valueTier];
 
   return (
     <div className="px-16 py-7">
-      <div className="mb-7 flex items-center justify-between">
-        <span
-          className="font-serif"
-          style={{ fontSize: 22, letterSpacing: -0.4 }}
-        >
-          DealSeal
-        </span>
-        <span
-          className="font-mono uppercase text-muted"
+      <div className="mb-7 flex justify-end">
+        <Link
+          href="/b"
+          className="font-mono uppercase text-muted hover:text-ink"
           style={{ fontSize: 10, letterSpacing: 2 }}
         >
-          Public profile · /b/{short}
-        </span>
+          ← Directory · /b/{short}
+        </Link>
       </div>
 
       <div
@@ -44,16 +115,19 @@ export function ReputationCard({ wallet }: { wallet: string }) {
             className="font-mono uppercase text-accent"
             style={{ fontSize: 11, letterSpacing: 2 }}
           >
-            Tier · trusted
+            Tier · {tierName}
           </div>
           <h1
             className="my-3 font-serif font-normal"
             style={{ fontSize: 72, lineHeight: 1.02, letterSpacing: -2 }}
           >
-            {short}
+            {displayName ?? short}
           </h1>
-          <div className="text-base text-muted">
-            Wellington · Independent · First seen {stats.firstSeen}
+          <div className="font-mono text-muted" style={{ fontSize: 12, letterSpacing: 0.4 }}>
+            {wallet}
+          </div>
+          <div className="mt-2 text-base text-muted">
+            First seen {firstSeenLabel} · Banded value tier {TIER_LABEL[stats.valueTier]}
           </div>
 
           <div
@@ -63,7 +137,7 @@ export function ReputationCard({ wallet }: { wallet: string }) {
             {[
               [String(stats.completed), "Completed", "var(--color-accent)"],
               [String(stats.disputed), "Disputed", "var(--color-ink)"],
-              [stats.disputeRate, "Dispute rate", "var(--color-ink)"],
+              [`${stats.disputeRate.toFixed(1)}%`, "Dispute rate", "var(--color-ink)"],
             ].map(([v, l, c]) => (
               <div key={l} className="bg-card px-5 py-6">
                 <div
@@ -82,118 +156,143 @@ export function ReputationCard({ wallet }: { wallet: string }) {
             ))}
           </div>
 
-          <div className="mt-6 border border-rule bg-card p-6">
+          <div className="mt-6 border border-rule bg-card">
             <div
-              className="mb-4 font-mono uppercase text-muted"
+              className="border-b border-rule px-6 py-3 font-mono uppercase text-muted"
               style={{ fontSize: 10, letterSpacing: 1.5 }}
             >
-              Activity · last 18 months
+              Sealed history · {history.length}
             </div>
-            <div
-              className="flex items-end gap-1"
-              style={{ height: 80 }}
-            >
-              {activity.map((n, i) => (
-                <div
-                  key={i}
-                  style={{
-                    flex: 1,
-                    background: n === 0 ? "rgba(10,10,10,0.06)" : "var(--color-accent)",
-                    opacity: n === 0 ? 1 : 0.3 + n * 0.3,
-                    height: `${20 + n * 28}%`,
-                  }}
-                />
-              ))}
-            </div>
-            <div
-              className="mt-2 flex justify-between font-mono uppercase text-muted"
-              style={{ fontSize: 9, letterSpacing: 1 }}
-            >
-              <span>OCT &apos;24</span>
-              <span>APR &apos;26</span>
-            </div>
+            {history.length === 0 && (
+              <div className="px-6 py-8 text-sm text-muted">
+                No countersigned deals yet for this wallet.
+              </div>
+            )}
+            {history.map((h, i) => (
+              <div
+                key={i}
+                className="grid items-center px-6 py-3.5"
+                style={{
+                  gridTemplateColumns: "1fr 1.2fr 1.4fr 1.2fr",
+                  borderBottom:
+                    i < history.length - 1
+                      ? "1px solid var(--color-rule-soft)"
+                      : "none",
+                  fontSize: 13,
+                }}
+              >
+                <span className="font-mono" style={{ fontSize: 12 }}>
+                  {new Date(h.sealedAt * 1000).toISOString().slice(0, 10)}
+                </span>
+                <span
+                  className="font-mono uppercase text-muted"
+                  style={{ fontSize: 10, letterSpacing: 1 }}
+                >
+                  {h.role === "issuer" ? "Issued" : "Countersigned"}
+                </span>
+                <span className="font-mono" style={{ fontSize: 12 }}>
+                  {TIER_LABEL[h.valueTier]} tier
+                </span>
+                <span>
+                  <StatePill state={h.state} />
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
         <div>
           <div className="border border-rule bg-card p-6">
             <div
-              className="mb-3 font-mono uppercase text-muted"
-              style={{ fontSize: 10, letterSpacing: 1.5 }}
+              className="mb-4 flex items-baseline justify-between"
             >
-              What this profile shows · and doesn&apos;t
-            </div>
-            <div className="grid grid-cols-2">
-              <div className="border-r border-rule pr-4">
-                <div
-                  className="font-mono uppercase text-green"
-                  style={{ fontSize: 10, letterSpacing: 1, color: "var(--color-green)" }}
-                >
-                  Public
-                </div>
-                <ul
-                  className="mt-2 list-disc pl-5 font-serif"
-                  style={{ fontSize: 18, lineHeight: 1.4 }}
-                >
-                  <li>Completed count</li>
-                  <li>Dispute count + rate</li>
-                  <li>First-seen-on-platform</li>
-                  <li>Value tier (banded)</li>
-                </ul>
-              </div>
-              <div className="pl-5">
-                <div
-                  className="font-mono uppercase text-accent"
-                  style={{ fontSize: 10, letterSpacing: 1 }}
-                >
-                  Hidden
-                </div>
-                <ul
-                  className="mt-2 list-disc pl-5 font-serif text-muted"
-                  style={{ fontSize: 18, lineHeight: 1.4 }}
-                >
-                  <li>Counterparties</li>
-                  <li>Raw amounts</li>
-                  <li>PDF contents</li>
-                  <li>Email / name</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 bg-ink p-6 text-paper">
-            <div
-              className="mb-2.5 font-mono uppercase"
-              style={{
-                fontSize: 10,
-                letterSpacing: 1.5,
-                color: "rgba(255,255,255,0.7)",
-              }}
-            >
-              Latest seal
-            </div>
-            <div className="font-serif" style={{ fontSize: 26, lineHeight: 1.1 }}>
-              Services Agreement
+              <span
+                className="font-mono uppercase text-muted"
+                style={{ fontSize: 10, letterSpacing: 1.5 }}
+              >
+                How tiers work · banded, never raw
+              </span>
+              <span
+                className="font-mono uppercase text-accent"
+                style={{ fontSize: 10, letterSpacing: 1 }}
+              >
+                Currently · {tierName}
+              </span>
             </div>
             <div
-              className="mt-1.5 font-mono"
-              style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}
+              className="border border-rule"
+              style={{ background: "var(--color-rule)", display: "grid", gap: 1 }}
             >
-              completed 2026-04-02 · NZD 25–50k tier
-            </div>
-            <div
-              className="mt-3.5 border-t border-dashed pt-3.5 font-mono"
-              style={{
-                fontSize: 11,
-                color: "rgba(255,255,255,0.9)",
-                borderColor: "rgba(255,255,255,0.2)",
-              }}
-            >
-              Counterparty: <span className="text-accent">hidden by default</span>
+              {([1, 2, 3, 4] as const).map((t) => {
+                const active = stats.valueTier === t;
+                return (
+                  <div
+                    key={t}
+                    className="grid items-center bg-card px-4 py-3"
+                    style={{ gridTemplateColumns: "20px 1fr 110px" }}
+                  >
+                    <span
+                      className="font-mono uppercase"
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        color: active ? "var(--color-accent)" : "var(--color-muted)",
+                      }}
+                    >
+                      {t}
+                    </span>
+                    <span
+                      className="font-serif"
+                      style={{
+                        fontSize: 18,
+                        lineHeight: 1,
+                        color: active ? "var(--color-accent)" : "var(--color-ink)",
+                      }}
+                    >
+                      {TIER_NAME[t]}
+                    </span>
+                    <span
+                      className="text-right font-mono text-muted"
+                      style={{ fontSize: 12, lineHeight: 1 }}
+                    >
+                      {TIER_LABEL[t]}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function StatePill({ state }: { state: string }) {
+  const isGood = state === "Released" || state === "Closed";
+  const isBad = state === "Disputed" || state === "Rescued";
+  const bg = isGood
+    ? "var(--color-green-soft)"
+    : isBad
+    ? "var(--color-accent-soft)"
+    : "rgba(10,10,10,0.06)";
+  const fg = isGood
+    ? "var(--color-green)"
+    : isBad
+    ? "var(--color-accent)"
+    : "var(--color-ink)";
+  return (
+    <span
+      className="font-mono uppercase"
+      style={{
+        background: bg,
+        color: fg,
+        fontSize: 10,
+        letterSpacing: 1,
+        padding: "4px 10px",
+      }}
+    >
+      {state}
+    </span>
   );
 }

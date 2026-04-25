@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {ReentrancyGuardUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+    "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EIP712Upgradeable} from
     "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
@@ -307,7 +307,7 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         bytes32 digest = _hashTypedDataV4(hashAttestation(a));
         // SignatureChecker handles ECDSA (with malleability rejection via
         // OZ's ECDSA.tryRecover) plus EIP-1271 for smart-contract wallets.
-        if (!SignatureChecker.isValidSignatureNowCalldata(signer, digest, signature)) {
+        if (!SignatureChecker.isValidSignatureNow(signer, digest, signature)) {
             revert BadAttestation();
         }
     }

@@ -82,7 +82,34 @@ export const escrowAbi = [
   },
 ] as const;
 
+const attestationTuple = {
+  name: "attestation",
+  type: "tuple",
+  components: [
+    { name: "wallet", type: "address" },
+    { name: "nameHash", type: "bytes32" },
+    { name: "emailHash", type: "bytes32" },
+    { name: "pdfHash", type: "bytes32" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+
 export const escrowFactoryAbi = [
+  {
+    type: "function",
+    name: "implementation",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "predictAddress",
+    stateMutability: "view",
+    inputs: [{ name: "salt", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
+  },
   {
     type: "function",
     name: "createEscrow",
@@ -95,18 +122,25 @@ export const escrowFactoryAbi = [
       { name: "dealDeadline", type: "uint64" },
       { name: "validUntil", type: "uint64" },
       { name: "secretHash", type: "bytes32" },
-      {
-        name: "partyAAttestation",
-        type: "tuple",
-        components: [
-          { name: "wallet", type: "address" },
-          { name: "nameHash", type: "bytes32" },
-          { name: "emailHash", type: "bytes32" },
-          { name: "pdfHash", type: "bytes32" },
-          { name: "nonce", type: "uint256" },
-          { name: "deadline", type: "uint256" },
-        ],
-      },
+      { ...attestationTuple, name: "partyAAttestation" },
+      { name: "partyASignature", type: "bytes" },
+    ],
+    outputs: [{ name: "escrow", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "createEscrowDeterministic",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "salt", type: "bytes32" },
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "pdfHash", type: "bytes32" },
+      { name: "pdfCid", type: "string" },
+      { name: "dealDeadline", type: "uint64" },
+      { name: "validUntil", type: "uint64" },
+      { name: "secretHash", type: "bytes32" },
+      { ...attestationTuple, name: "partyAAttestation" },
       { name: "partyASignature", type: "bytes" },
     ],
     outputs: [{ name: "escrow", type: "address" }],
@@ -120,6 +154,50 @@ export const escrowFactoryAbi = [
       { name: "token", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
     ],
+  },
+] as const;
+
+export const erc20Abi = [
+  {
+    type: "function",
+    name: "allowance",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "decimals",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+  {
+    type: "function",
+    name: "symbol",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
   },
 ] as const;
 

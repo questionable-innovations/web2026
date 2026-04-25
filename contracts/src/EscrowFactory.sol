@@ -45,6 +45,63 @@ contract EscrowFactory {
         bytes calldata partyASignature
     ) external returns (address escrow) {
         escrow = Clones.clone(implementation);
+        _init(
+            escrow,
+            token,
+            amount,
+            pdfHash,
+            pdfCid,
+            dealDeadline,
+            validUntil,
+            secretHash,
+            partyAAttestation,
+            partyASignature
+        );
+    }
+
+    /// @notice Deterministic counterpart used by the web client: Party A predicts
+    /// the clone address with `predictAddress(salt)`, EIP-712-signs an attestation
+    /// bound to that address, then submits the tx. Avoids the chicken-and-egg of
+    /// "the domain separator depends on the address that doesn't exist yet."
+    function createEscrowDeterministic(
+        bytes32 salt,
+        IERC20 token,
+        uint256 amount,
+        bytes32 pdfHash,
+        string calldata pdfCid,
+        uint64 dealDeadline,
+        uint64 validUntil,
+        bytes32 secretHash,
+        Escrow.Attestation calldata partyAAttestation,
+        bytes calldata partyASignature
+    ) external returns (address escrow) {
+        escrow = Clones.cloneDeterministic(implementation, salt);
+        _init(
+            escrow,
+            token,
+            amount,
+            pdfHash,
+            pdfCid,
+            dealDeadline,
+            validUntil,
+            secretHash,
+            partyAAttestation,
+            partyASignature
+        );
+    }
+
+    function _init(
+        address escrow,
+        IERC20 token,
+        uint256 amount,
+        bytes32 pdfHash,
+        string calldata pdfCid,
+        uint64 dealDeadline,
+        uint64 validUntil,
+        bytes32 secretHash,
+        Escrow.Attestation calldata partyAAttestation,
+        bytes calldata partyASignature
+    ) internal {
         Escrow(escrow).initialize(
             msg.sender,
             token,

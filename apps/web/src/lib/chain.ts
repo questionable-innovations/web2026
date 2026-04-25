@@ -11,6 +11,10 @@ export const depositToken = {
   decimals: Number(process.env.NEXT_PUBLIC_DEPOSIT_TOKEN_DECIMALS ?? 18),
 };
 
-export const contractRegistryAddress = (process.env
-  .NEXT_PUBLIC_CONTRACT_REGISTRY ??
+/// EscrowFactory deployment. Read by every signing flow; without it, on-chain
+/// calls will revert. Set after `forge script script/Deploy.s.sol`.
+export const escrowFactoryAddress = (process.env.NEXT_PUBLIC_ESCROW_FACTORY ??
+  process.env.NEXT_PUBLIC_CONTRACT_REGISTRY ??
   "0x0000000000000000000000000000000000000000") as `0x${string}`;
+
+export const contractRegistryAddress = escrowFactoryAddress;

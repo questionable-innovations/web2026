@@ -19,7 +19,15 @@ const aTokenAbi = [
 // Aave V3 aUSDC on Avalanche
 const A_TOKEN_USDC = "0x625E7708f30cA75bfd92586e17077590C60eb4cD" as Address;
 
-export function AdminContractsTable({ contracts }: { contracts: any[] }) {
+type ContractData = {
+  id: string;
+  escrowAddress: string | null;
+  title: string;
+  depositAmount: string;
+  state: string;
+};
+
+export function AdminContractsTable({ contracts }: { contracts: ContractData[] }) {
   // Try to query balance of aUSDC for every contract address
   const wagmiCalls = useMemo(() => {
     return contracts.map((c) => ({

@@ -16,6 +16,12 @@ export default async function AdminPage() {
     .where(inArray(contracts.state, ["Active", "Releasing", "Disputed"]))
     .orderBy(desc(contracts.createdAt));
 
+  // Ensure dates are parsed to strings to avoid Next.js Server-to-Client serialization issues
+  const serializedContracts = activeContracts.map((c) => ({
+    ...c,
+    createdAt: c.createdAt.toISOString(),
+  }));
+
   return (
     <div className="min-h-screen bg-stone-50">
       <AppNav active={"admin"} />
@@ -26,7 +32,7 @@ export default async function AdminPage() {
             Monitor active escrow contracts and platform interest gains from Aave integration.
           </p>
 
-          <AdminContractsTable contracts={activeContracts} />
+          <AdminContractsTable contracts={serializedContracts} />
         </div>
       </div>
     </div>

@@ -110,7 +110,7 @@ function Hero() {
     <Section pad="pb-16 pt-20" border={false}>
       <div className="grid items-center gap-14 lg:grid-cols-2">
         <div>
-          <Eyebrow accent>Web3 NZ Hackathon · 2026</Eyebrow>
+          <Eyebrow accent>Now in open beta · Avalanche</Eyebrow>
           <h1
             className="mt-6 font-serif font-normal"
             style={{ fontSize: 88, lineHeight: 0.98, letterSpacing: -2 }}
@@ -133,14 +133,14 @@ function Hero() {
               className="bg-ink px-6 py-3.5 text-paper"
               style={{ fontSize: 14, letterSpacing: 0.3 }}
             >
-              Watch the 60-second demo →
+              Seal your first contract →
             </Link>
             <a
               href="#how-it-works"
               className="border border-ink px-6 py-3.5"
               style={{ fontSize: 14 }}
             >
-              Read the brief
+              How it works
             </a>
           </div>
           <div
@@ -601,38 +601,44 @@ function ClosingCTA() {
             color: "rgba(255,255,255,0.6)",
           }}
         >
-          § 05 / Demo
+          § 05 / Get started
         </div>
         <div>
           <div
             className="font-serif font-normal"
             style={{ fontSize: 72, lineHeight: 1, letterSpacing: -1.5, maxWidth: 980 }}
           >
-            Built for the Web3 NZ 2026 hackathon.
+            Sign in with your wallet.
             <br />
-            <em className="text-accent">Try it on Fuji testnet</em> — no real
-            funds, no real risk.
+            <em className="text-accent">Seal your first contract</em> in
+            under five minutes.
           </div>
-          <div className="mt-12 flex flex-wrap gap-3.5">
+          <p
+            className="mt-6 max-w-xl leading-relaxed"
+            style={{ fontSize: 16, color: "rgba(245,243,238,0.75)" }}
+          >
+            No account to create. No card to enter. Connect a wallet — or
+            sign in with email and we&apos;ll create one for you — upload
+            the PDF, set the deposit, send the link.
+          </p>
+          <div className="mt-10 flex flex-wrap gap-3.5">
             <Link
               href="/new"
               className="bg-accent px-7 py-4 text-white"
               style={{ fontSize: 15, letterSpacing: 0.3 }}
             >
-              Open the demo →
+              Sign in &amp; upload your PDF →
             </Link>
-            <a
-              href="https://github.com/"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              href="/contracts"
               className="px-7 py-4 text-paper"
               style={{
                 fontSize: 15,
                 border: "1px solid rgba(245,243,238,0.3)",
               }}
             >
-              Read the contracts
-            </a>
+              Open my contracts
+            </Link>
           </div>
         </div>
       </div>
@@ -651,7 +657,7 @@ function Footer() {
       }}
     >
       <span>DEALSEAL.NZ · © 2026</span>
-      <span>FUJI TESTNET · DEMONSTRATION ONLY · NOT FOR REAL FUNDS</span>
+      <span>NON-CUSTODIAL · AVALANCHE C-CHAIN · DNZD-DENOMINATED</span>
       <span>SOURCE · CONTRACTS · LEGAL</span>
     </footer>
   );

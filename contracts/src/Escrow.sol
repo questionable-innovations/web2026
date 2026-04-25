@@ -28,7 +28,8 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         Releasing,
         Released,
         Disputed,
-        Closed
+        Closed,
+        Rescued
     }
 
     /// EIP-712 typed data for an attestation.
@@ -65,6 +66,7 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
     bool public secretConsumed;
 
     State public state;
+    State public preDisputeState;
     address public proposedReleaseBy;
     address public disputedBy;
     string public disputeReason;
@@ -216,20 +218,30 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         if (state != State.Active && state != State.Releasing) {
             revert WrongState(State.Active, state);
         }
+        preDisputeState = state;
         state = State.Disputed;
         disputedBy = msg.sender;
         disputeReason = reason;
         emit Disputed(msg.sender, reason);
     }
 
-    /// @notice Only the party who flagged the dispute may withdraw it,
-    ///         returning to Active so the parties can keep negotiating
-    ///         instead of being forced to wait out RESCUE_TIMEOUT.
+    /// @notice Only the party who flagged the dispute may withdraw it.
+    ///         Restores the *exact* prior state so a dispute raised mid-
+    ///         release doesn't silently revert the counterparty's pending
+    ///         proposal — they'd have to repropose otherwise (grief vector).
     function cancelDispute() external inState(State.Disputed) {
         if (msg.sender != disputedBy) revert NotDisputer();
-        state = State.Active;
+        State prior = preDisputeState;
+        state = prior;
+        preDisputeState = State.Draft;
         disputedBy = address(0);
         disputeReason = "";
+        // If we're not returning to Releasing, the prior proposal (if any)
+        // is no longer meaningful — clear it so a stale `proposedReleaseBy`
+        // doesn't shadow a fresh proposeRelease/approveRelease pairing.
+        if (prior != State.Releasing) {
+            proposedReleaseBy = address(0);
+        }
         emit DisputeCancelled(msg.sender);
     }
 
@@ -239,6 +251,13 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
     ///         the deadline. Callable by either signer (§4.2).
     function rescue() external nonReentrant {
         if (msg.sender != partyA && msg.sender != partyB) revert NotASigner();
+        // Don't unwind a deal that's already terminated — withdraw() set
+        // state to Closed and zeroed the balance; rescuing from there would
+        // either revert on `bal == 0` or claw back stray dust to the wrong
+        // party. Explicit state guard makes the intent legible.
+        if (state == State.Closed || state == State.Rescued) {
+            revert WrongState(State.Active, state);
+        }
         if (block.timestamp < uint256(deadline) + RESCUE_TIMEOUT) {
             revert RescueTimeoutNotReached();
         }
@@ -247,9 +266,11 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
 
         // For the v1 demo, send to caller. Full fix (try partyA first, fall
         // back to partyB on transfer failure) is tracked separately.
+        // Lands in `Rescued`, *not* `Closed`, so ReputationView doesn't
+        // count an unhappy unwind as a successfully completed deal.
         address recipient = msg.sender;
         withdrawable = 0;
-        state = State.Closed;
+        state = State.Rescued;
         token.safeTransfer(recipient, bal);
         emit Rescued(recipient, bal);
     }

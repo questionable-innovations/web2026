@@ -46,6 +46,24 @@ contract EscrowTest is Test {
         );
     }
 
+    bytes32 constant ATTESTATION_TYPEHASH = keccak256(
+        "Attestation(address wallet,bytes32 nameHash,bytes32 emailHash,bytes32 pdfHash,uint256 nonce,uint256 deadline)"
+    );
+
+    function _hashAttestation(Escrow.Attestation memory a) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                ATTESTATION_TYPEHASH,
+                a.wallet,
+                a.nameHash,
+                a.emailHash,
+                a.pdfHash,
+                a.nonce,
+                a.deadline
+            )
+        );
+    }
+
     function _attest(Vm.Wallet memory w, address escrow, bytes32 pdfHash, uint256 nonce)
         internal
         view
@@ -59,7 +77,9 @@ contract EscrowTest is Test {
             nonce: nonce,
             deadline: block.timestamp + 1 days
         });
-        bytes32 structHash = Escrow(escrow).hashAttestation(a);
+        // Hash structurally — the predicted clone address has no code yet,
+        // so we can't ask it for the struct hash.
+        bytes32 structHash = _hashAttestation(a);
         bytes32 digest = _toTypedData(_domainSeparator(escrow), structHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(w, digest);
         sig = abi.encodePacked(r, s, v);
@@ -271,7 +291,41 @@ contract EscrowTest is Test {
         vm.prank(bob.addr);
         e.rescue();
         assertEq(token.balanceOf(bob.addr) - bobBefore, 1_000 ether);
-        assertEq(uint8(e.state()), uint8(Escrow.State.Closed));
+        // Rescued, not Closed — keeps ReputationView from counting an
+        // unhappy unwind as a successful completion.
+        assertEq(uint8(e.state()), uint8(Escrow.State.Rescued));
+    }
+
+    function test_cancelDisputeFromReleasingRestoresReleasing() public {
+        Escrow e = _createWithSig();
+        bytes32 pdfHash = keccak256("pdf-bytes");
+        (Escrow.Attestation memory aB, bytes memory sigB) =
+            _attest(bob, address(e), pdfHash, 0);
+
+        vm.startPrank(bob.addr);
+        token.approve(address(e), 1_000 ether);
+        e.countersign(SECRET, aB, sigB);
+        vm.stopPrank();
+
+        vm.prank(alice.addr);
+        e.proposeRelease();
+        assertEq(uint8(e.state()), uint8(Escrow.State.Releasing));
+
+        // Bob disputes from Releasing, then withdraws the dispute.
+        vm.prank(bob.addr);
+        e.flagDispute("changed mind");
+        vm.prank(bob.addr);
+        e.cancelDispute();
+
+        // State must restore to Releasing (not Active) so Alice's pending
+        // proposal isn't griefed away.
+        assertEq(uint8(e.state()), uint8(Escrow.State.Releasing));
+        assertEq(e.proposedReleaseBy(), alice.addr);
+
+        // And approveRelease still works.
+        vm.prank(bob.addr);
+        e.approveRelease();
+        assertEq(uint8(e.state()), uint8(Escrow.State.Released));
     }
 
     function test_cannotApproveOwnProposal() public {

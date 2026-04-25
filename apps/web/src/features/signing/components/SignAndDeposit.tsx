@@ -19,6 +19,7 @@ import { erc20Abi, escrowAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
+import { ChainGate } from "./ChainGate";
 import { ProfileGate, type Profile } from "./ProfileGate";
 
 type ContractInfo = {
@@ -51,13 +52,15 @@ export function SignAndPay({
       {(address) => (
         <ProfileGate wallet={address}>
           {(profile) => (
-            <Inner
-              info={info}
-              secret={secret}
-              wallet={address}
-              profile={profile}
-              onDone={onDone}
-            />
+            <ChainGate>
+              <Inner
+                info={info}
+                secret={secret}
+                wallet={address}
+                profile={profile}
+                onDone={onDone}
+              />
+            </ChainGate>
           )}
         </ProfileGate>
       )}
@@ -110,6 +113,15 @@ function Inner({
     functionName: "allowance",
     args: [wallet, info.escrowAddress],
   });
+  // Source of truth: the token contract. Falls back to env until the
+  // network read lands so the UI doesn't flash NaN.
+  const { data: onchainDecimals } = useReadContract({
+    address: info.depositToken,
+    abi: erc20Abi,
+    functionName: "decimals",
+  });
+  const decimals =
+    typeof onchainDecimals === "number" ? onchainDecimals : depositToken.decimals;
 
   const insufficient =
     onchainAmount !== undefined &&
@@ -265,7 +277,7 @@ function Inner({
           {balance !== undefined && (
             <span>
               balance:{" "}
-              {formatUnits(balance as bigint, depositToken.decimals)}{" "}
+              {formatUnits(balance as bigint, decimals)}{" "}
               {depositToken.symbol}
             </span>
           )}

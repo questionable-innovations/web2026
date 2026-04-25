@@ -4,6 +4,7 @@ import { eq, or, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contracts, attestations } from "@/server/db/schema";
 import { randomUUID } from "node:crypto";
+import { readEscrow } from "@/lib/server-chain";
 
 const Body = z.object({
   title: z.string().min(1),
@@ -52,8 +53,40 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const id = randomUUID();
   const d = parsed.data;
+
+  // Verify on-chain state matches the claim before persisting. Without this,
+  // anyone could POST arbitrary metadata against any escrow address and
+  // pollute the dashboard / "verified" badges.
+  const onchain = await readEscrow(d.escrowAddress as `0x${string}`).catch(
+    () => null,
+  );
+  if (!onchain) {
+    return NextResponse.json(
+      { error: "escrow not deployed" },
+      { status: 409 },
+    );
+  }
+  if (onchain.state !== "AwaitingCounterparty") {
+    return NextResponse.json(
+      { error: `escrow in unexpected state ${onchain.state}` },
+      { status: 409 },
+    );
+  }
+  if (onchain.partyA.toLowerCase() !== d.partyA.wallet.toLowerCase()) {
+    return NextResponse.json(
+      { error: "partyA mismatch" },
+      { status: 409 },
+    );
+  }
+  if (onchain.pdfHash.toLowerCase() !== d.pdfHash.toLowerCase()) {
+    return NextResponse.json(
+      { error: "pdfHash mismatch" },
+      { status: 409 },
+    );
+  }
+
+  const id = randomUUID();
   await db.insert(contracts).values({
     id,
     escrowAddress: d.escrowAddress.toLowerCase(),

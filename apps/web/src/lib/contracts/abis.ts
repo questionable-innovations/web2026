@@ -95,6 +95,48 @@ export const escrowAbi = [
     inputs: [],
     outputs: [{ name: "", type: "uint64" }],
   },
+  {
+    type: "function",
+    name: "deadline",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
+    type: "function",
+    name: "partyA",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "partyB",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "pdfHash",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+  },
+  {
+    type: "function",
+    name: "factory",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "cancelDispute",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
 ] as const;
 
 export const escrowFactoryAbi = [
@@ -111,23 +153,6 @@ export const escrowFactoryAbi = [
     stateMutability: "view",
     inputs: [{ name: "salt", type: "bytes32" }],
     outputs: [{ name: "", type: "address" }],
-  },
-  {
-    type: "function",
-    name: "createEscrow",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "pdfHash", type: "bytes32" },
-      { name: "pdfCid", type: "string" },
-      { name: "dealDeadline", type: "uint64" },
-      { name: "validUntil", type: "uint64" },
-      { name: "secretHash", type: "bytes32" },
-      { ...attestationStructTuple, name: "partyAAttestation" },
-      { name: "partyASignature", type: "bytes" },
-    ],
-    outputs: [{ name: "escrow", type: "address" }],
   },
   {
     type: "function",

@@ -27,10 +27,9 @@ contract ReputationView {
             address e = factory.escrowsByParty(party, i);
             Escrow.State st = Escrow(e).state();
             // `Released` (approved, not yet withdrawn) and `Closed` (the
-            // canonical post-withdraw state) both count as completed deals.
-            // `Closed` is also reached by `rescue()` — for v1 we accept that
-            // a rescue is indistinguishable from a normal completion in the
-            // tier; the dispute count + active count still narrate the rest.
+            // canonical post-withdraw state) count as completed deals.
+            // `Rescued` deliberately does *not* count — a unilateral
+            // timeout-rescue isn't a successful completion.
             if (st == Escrow.State.Released || st == Escrow.State.Closed) {
                 s.completed++;
                 completedValue += Escrow(e).amount();

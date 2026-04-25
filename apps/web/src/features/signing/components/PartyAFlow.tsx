@@ -17,13 +17,21 @@ import {
   newSalt,
 } from "@/lib/attestation";
 import { activeChain, depositToken, escrowFactoryAddress } from "@/lib/chain";
-import { escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
+import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { PdfViewer } from "./PdfViewer";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
+import { ChainGate } from "./ChainGate";
 import { ProfileGate, type Profile } from "./ProfileGate";
 import { PdfThumb, StateBadge } from "@/components/AppShell";
+
+/// Default URL-link validity. Decoupled from the deal deadline because the
+/// link is a bearer secret — keeping it valid for the full deal length
+/// extends the phishing window unnecessarily. Counterparty has 7 days from
+/// the sender pressing "share" to countersign; if they miss it, partyA
+/// re-issues a link.
+const LINK_VALIDITY_SECONDS = 7 * 86_400;
 
 type Stage =
   | "details"
@@ -65,7 +73,11 @@ export function PartyAFlow() {
     >
       {(address) => (
         <ProfileGate wallet={address}>
-          {(profile) => <Inner wallet={address} profile={profile} />}
+          {(profile) => (
+            <ChainGate>
+              <Inner wallet={address} profile={profile} />
+            </ChainGate>
+          )}
         </ProfileGate>
       )}
     </WalletGate>
@@ -266,14 +278,16 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!file) return;
+        // Contract rejects deadline <= now; require at least 1 day so the
+        // user gets a clear UI error instead of a wallet-prompt revert.
+        const dayCount = Math.max(1, Number(days || 0));
         onNext({
           file,
           title,
           counterpartyName,
           counterpartyEmail,
           amount,
-          dealDeadline:
-            Math.floor(Date.now() / 1000) + Number(days) * 86_400,
+          dealDeadline: Math.floor(Date.now() / 1000) + dayCount * 86_400,
         });
       }}
     >
@@ -591,11 +605,21 @@ function SignStep({
               });
 
               const dealDeadline = BigInt(details.dealDeadline);
-              const validUntil = dealDeadline;
-              const amountWei = parseUnits(
-                details.amount,
-                depositToken.decimals,
+              // Link validity is decoupled from the deal deadline. The
+              // contract enforces validUntil <= deadline, so we clamp.
+              const linkExpiry = BigInt(
+                Math.floor(Date.now() / 1000) + LINK_VALIDITY_SECONDS,
               );
+              const validUntil =
+                linkExpiry < dealDeadline ? linkExpiry : dealDeadline;
+              // Read decimals from chain — env-derived decimals risk an
+              // off-by-10^n bug if misconfigured.
+              const decimals = (await publicClient.readContract({
+                address: depositToken.address,
+                abi: erc20Abi,
+                functionName: "decimals",
+              })) as number;
+              const amountWei = parseUnits(details.amount, decimals);
 
               const txHash = await writeContractAsync({
                 address: escrowFactoryAddress,

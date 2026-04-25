@@ -133,7 +133,7 @@ export function AdminContractsTable({ contracts }: { contracts: ContractData[] }
           {contracts.length === 0 && (
             <tr>
               <td colSpan={6} className="text-center py-8 text-zinc-500">
-                No active contracts found.
+                No contracts found.
               </td>
             </tr>
           )}

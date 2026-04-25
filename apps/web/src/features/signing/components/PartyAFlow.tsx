@@ -164,6 +164,7 @@ function Inner({
 
       {stage === "details" && (
         <DetailsStep
+          initial={details}
           onNext={(d) => {
             setDetails(d);
             setStage("sign");
@@ -258,14 +259,30 @@ function Steps({ current }: { current: Stage }) {
   );
 }
 
-function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
-  const [file, setFile] = useState<File | null>(null);
+function DetailsStep({
+  onNext,
+  initial,
+}: {
+  onNext: (d: Details) => void;
+  initial: Details | null;
+}) {
+  const [file, setFile] = useState<File | null>(initial?.file ?? null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [title, setTitle] = useState("");
-  const [counterpartyName, setCounterpartyName] = useState("");
-  const [counterpartyEmail, setCounterpartyEmail] = useState("");
-  const [amount, setAmount] = useState("");
-  const [days, setDays] = useState("30");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [counterpartyName, setCounterpartyName] = useState(
+    initial?.counterpartyName ?? "",
+  );
+  const [counterpartyEmail, setCounterpartyEmail] = useState(
+    initial?.counterpartyEmail ?? "",
+  );
+  const [amount, setAmount] = useState(initial?.amount ?? "");
+  const [days, setDays] = useState(() => {
+    if (!initial) return "30";
+    const remaining = Math.round(
+      (initial.dealDeadline - Date.now() / 1000) / 86_400,
+    );
+    return String(Math.max(1, remaining));
+  });
 
   const handleFile = async (selectedFile: File | null) => {
     setFile(selectedFile);
@@ -500,7 +517,7 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
               Quick Sign
             </span>
           </div>
-          <PdfThumb height={210} />
+          {file ? <PdfViewer file={file} /> : <PdfThumb height={210} />}
         </div>
         <div className="mt-4 bg-ink p-5 text-paper">
           <div
@@ -625,6 +642,16 @@ function SignStep({
             </p>
           )}
         </div>
+
+        <button
+          type="button"
+          disabled={stage !== "sign"}
+          onClick={() => setStage("details")}
+          className="w-full border border-rule px-5 py-3 text-ink disabled:opacity-50"
+          style={{ fontSize: 13 }}
+        >
+          ← Back to details
+        </button>
 
         <button
           type="button"

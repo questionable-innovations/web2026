@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq, or, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contracts, attestations } from "@/server/db/schema";
 import { randomUUID } from "node:crypto";
@@ -21,6 +22,29 @@ const Body = z.object({
     attestationHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   }),
 });
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const wallet = url.searchParams.get("wallet")?.toLowerCase();
+  const rows = wallet
+    ? await db
+        .select()
+        .from(contracts)
+        .where(
+          or(
+            eq(contracts.partyAWallet, wallet),
+            eq(contracts.partyBWallet, wallet),
+          ),
+        )
+        .orderBy(desc(contracts.createdAt))
+        .limit(100)
+    : await db
+        .select()
+        .from(contracts)
+        .orderBy(desc(contracts.createdAt))
+        .limit(100);
+  return NextResponse.json({ contracts: rows });
+}
 
 export async function POST(req: Request) {
   const json = await req.json().catch(() => null);

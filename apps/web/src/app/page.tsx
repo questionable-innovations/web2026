@@ -47,15 +47,12 @@ function TopBar() {
         <a href="#trust">Legal &amp; security</a>
       </nav>
       <div className="flex items-center gap-3">
-        <Link href="/contracts" className="text-[14px]">
-          Sign in
-        </Link>
         <Link
           href="/new"
           className="bg-ink px-4 py-2.5 text-[13px] text-paper"
           style={{ letterSpacing: 0.3 }}
         >
-          Try the demo →
+          Sign in →
         </Link>
       </div>
     </header>

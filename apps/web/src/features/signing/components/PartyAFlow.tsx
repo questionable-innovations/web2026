@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  useAccount,
   usePublicClient,
   useSignTypedData,
   useWriteContract,
@@ -60,7 +61,21 @@ const STEPS: [string, Stage[]][] = [
   ["Send", ["share"]],
 ];
 
+/// Wallet-first entry point. Anyone uploading a PDF must first prove they
+/// hold a wallet — that wallet becomes Party A's identity, the EIP-712
+/// signer, and the address reputation accrues to.
 export function PartyAFlow() {
+  return (
+    <WalletGate
+      title="Sign in to seal a deal"
+      blurb="DealSeal is wallet-first. Connect a wallet to upload your PDF — your signature, your deposit terms, and your reputation all anchor to it."
+    >
+      {(address) => <Inner wallet={address} />}
+    </WalletGate>
+  );
+}
+
+function Inner({ wallet }: { wallet: `0x${string}` }) {
   const [stage, setStage] = useState<Stage>("details");
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<Details | null>(null);
@@ -82,6 +97,29 @@ export function PartyAFlow() {
 
   return (
     <div>
+      <div className="mb-6 flex items-center justify-between border border-rule bg-card px-5 py-3">
+        <div className="flex items-center gap-3">
+          <span
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-ink font-serif text-paper"
+            style={{ fontSize: 12 }}
+          >
+            ✓
+          </span>
+          <div>
+            <div className="ds-eyebrow">Signed in as</div>
+            <div className="font-mono" style={{ fontSize: 12 }}>
+              {wallet}
+            </div>
+          </div>
+        </div>
+        <span
+          className="font-mono uppercase text-muted"
+          style={{ fontSize: 10, letterSpacing: 1 }}
+        >
+          Wallet · {activeChain.name}
+        </span>
+      </div>
+
       <div className="mb-8 flex items-baseline justify-between">
         <div>
           <div className="ds-eyebrow">{headerEyebrow}</div>
@@ -111,6 +149,7 @@ export function PartyAFlow() {
       {stage === "identify" && details && (
         <IdentifyStep
           file={details.file}
+          wallet={wallet}
           onBack={() => setStage("details")}
           onNext={(id) => {
             setIdentity(id);
@@ -123,6 +162,7 @@ export function PartyAFlow() {
         details &&
         identity && (
           <SignStep
+            wallet={wallet}
             details={details}
             identity={identity}
             stage={stage}
@@ -443,10 +483,12 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
 
 function IdentifyStep({
   file,
+  wallet,
   onBack,
   onNext,
 }: {
   file: File;
+  wallet: `0x${string}`;
   onBack: () => void;
   onNext: (id: Identity) => void;
 }) {
@@ -463,6 +505,17 @@ function IdentifyStep({
       <div className="space-y-4">
         <div className="border border-rule bg-card p-6">
           <div className="ds-eyebrow mb-3">Your identity</div>
+          <div
+            className="mb-4 bg-paper px-3 py-2.5 font-mono"
+            style={{
+              fontSize: 11,
+              border: "1px solid var(--color-rule)",
+              lineHeight: 1.6,
+            }}
+          >
+            <div className="text-muted">Wallet (signed in)</div>
+            <div>{wallet}</div>
+          </div>
           <FieldLabel>Your full name</FieldLabel>
           <input
             value={name}
@@ -473,6 +526,13 @@ function IdentifyStep({
           <div style={{ height: 14 }} />
           <FieldLabel>Your email (verified)</FieldLabel>
           <EmailVerify onVerified={setVerifiedEmail} />
+          <p
+            className="mt-3 font-mono text-muted"
+            style={{ fontSize: 10, lineHeight: 1.5 }}
+          >
+            Name + email are committed as <em>salted hashes</em> on-chain
+            (CCLA s.229). Plaintext stays in our DB; revealed only on dispute.
+          </p>
         </div>
 
         <div className="flex justify-between">
@@ -500,6 +560,7 @@ function IdentifyStep({
 }
 
 function SignStep({
+  wallet,
   details,
   identity,
   stage,
@@ -507,6 +568,7 @@ function SignStep({
   setError,
   onDone,
 }: {
+  wallet: `0x${string}`;
   details: Details;
   identity: Identity;
   stage: Stage;
@@ -526,230 +588,228 @@ function SignStep({
   );
 
   return (
-    <WalletGate>
-      {(address) => (
-        <div className="grid gap-6" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
-          <div className="border border-rule bg-card p-3">
-            <PdfViewer file={details.file} />
+    <div className="grid gap-6" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
+      <div className="border border-rule bg-card p-3">
+        <PdfViewer file={details.file} />
+      </div>
+      <div className="space-y-4">
+        <div className="border border-rule bg-card p-6">
+          <div className="ds-eyebrow mb-3">Confirmation</div>
+          <Summary details={details} identity={identity} wallet={wallet} />
+
+          <div className="mt-5">
+            <FieldLabel>Your signature</FieldLabel>
+            <SignaturePad onChange={setSignatureDataUrl} />
           </div>
-          <div className="space-y-4">
-            <div className="border border-rule bg-card p-6">
-              <div className="ds-eyebrow mb-3">Confirmation</div>
-              <Summary
-                details={details}
-                identity={identity}
-                wallet={address}
-              />
 
-              <div className="mt-5">
-                <FieldLabel>Your signature</FieldLabel>
-                <SignaturePad onChange={setSignatureDataUrl} />
-              </div>
+          {!factoryReady && (
+            <p
+              className="mt-3 font-mono text-accent"
+              style={{ fontSize: 11 }}
+            >
+              Set <code>NEXT_PUBLIC_ESCROW_FACTORY</code> to a deployed
+              EscrowFactory address.
+            </p>
+          )}
+        </div>
 
-              {!factoryReady && (
-                <p className="mt-3 font-mono text-accent" style={{ fontSize: 11 }}>
-                  Set <code>NEXT_PUBLIC_ESCROW_FACTORY</code> to a deployed
-                  EscrowFactory address.
-                </p>
-              )}
-            </div>
+        <button
+          type="button"
+          disabled={
+            !factoryReady ||
+            !signatureDataUrl ||
+            stage !== "sign" ||
+            !publicClient
+          }
+          className="w-full bg-accent px-5 py-4 text-paper disabled:opacity-50"
+          style={{ color: "#fff" }}
+          onClick={async () => {
+            if (!publicClient) return;
+            setError(null);
+            try {
+              setStage("deploying");
+              const buf = await details.file.arrayBuffer();
+              const pdfHash = (await sha256(buf)) as `0x${string}`;
 
-            <button
-              type="button"
-              disabled={
-                !factoryReady ||
-                !signatureDataUrl ||
-                stage !== "sign" ||
-                !publicClient
-              }
-              className="w-full bg-accent px-5 py-4 text-paper disabled:opacity-50"
-              style={{ color: "#fff" }}
-              onClick={async () => {
-                if (!publicClient) return;
-                setError(null);
-                try {
-                  setStage("deploying");
-                  const buf = await details.file.arrayBuffer();
-                  const pdfHash = (await sha256(buf)) as `0x${string}`;
+              const fd = new FormData();
+              fd.append("file", details.file);
+              const upload = await fetch("/api/ipfs", {
+                method: "POST",
+                body: fd,
+              });
+              if (!upload.ok) throw new Error("IPFS pin failed");
+              const { cid } = (await upload.json()) as { cid: string };
 
-                  const fd = new FormData();
-                  fd.append("file", details.file);
-                  const upload = await fetch("/api/ipfs", {
-                    method: "POST",
-                    body: fd,
-                  });
-                  if (!upload.ok) throw new Error("IPFS pin failed");
-                  const { cid } = (await upload.json()) as { cid: string };
+              const secret = newSecret();
+              const sHash = secretHash(secret);
+              const nameSalt = newSalt();
+              const emailSalt = newSalt();
 
-                  const secret = newSecret();
-                  const sHash = secretHash(secret);
-                  const nameSalt = newSalt();
-                  const emailSalt = newSalt();
+              const salt = newSalt();
+              const predicted = (await publicClient.readContract({
+                address: escrowFactoryAddress,
+                abi: escrowFactoryAbi,
+                functionName: "predictAddress",
+                args: [salt],
+              })) as `0x${string}`;
 
-                  const salt = newSalt();
-                  const predicted = (await publicClient.readContract({
-                    address: escrowFactoryAddress,
-                    abi: escrowFactoryAbi,
-                    functionName: "predictAddress",
-                    args: [salt],
-                  })) as `0x${string}`;
+              const attestation = buildAttestation({
+                wallet,
+                name: identity.name,
+                email: identity.email,
+                nameSalt,
+                emailSalt,
+                pdfHash,
+              });
+              const signature = await signTypedDataAsync({
+                domain: eip712Domain(chainId, predicted),
+                types: eip712Types,
+                primaryType: "Attestation",
+                message: attestation,
+              });
 
-                  const attestation = buildAttestation({
-                    wallet: address,
+              const dealDeadline = BigInt(details.dealDeadline);
+              const validUntil = dealDeadline;
+              const amountWei = parseUnits(
+                details.amount,
+                depositToken.decimals,
+              );
+
+              const txHash = await writeContractAsync({
+                address: escrowFactoryAddress,
+                abi: escrowFactoryAbi,
+                functionName: "createEscrowDeterministic",
+                args: [
+                  salt,
+                  depositToken.address,
+                  amountWei,
+                  pdfHash,
+                  cid,
+                  dealDeadline,
+                  validUntil,
+                  sHash,
+                  attestation,
+                  signature,
+                ],
+              });
+              await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+              setStage("registering");
+              const attestationStructHash = (await publicClient.readContract({
+                address: predicted,
+                abi: escrowAbi,
+                functionName: "hashAttestation",
+                args: [attestation],
+              })) as `0x${string}`;
+
+              const res = await fetch("/api/contracts", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                  title: details.title,
+                  counterpartyEmail: details.counterpartyEmail,
+                  counterpartyName: details.counterpartyName,
+                  amount: details.amount,
+                  pdfHash,
+                  pdfCid: cid,
+                  escrowAddress: predicted,
+                  secretHash: sHash,
+                  dealDeadline: details.dealDeadline,
+                  partyA: {
+                    wallet,
                     name: identity.name,
                     email: identity.email,
-                    nameSalt,
-                    emailSalt,
-                    pdfHash,
-                  });
-                  const signature = await signTypedDataAsync({
-                    domain: eip712Domain(chainId, predicted),
-                    types: eip712Types,
-                    primaryType: "Attestation",
-                    message: attestation,
-                  });
+                    attestationHash: attestationStructHash,
+                  },
+                }),
+              });
+              if (!res.ok) throw new Error("Failed to save contract index");
 
-                  const dealDeadline = BigInt(details.dealDeadline);
-                  const validUntil = dealDeadline;
-                  const amountWei = parseUnits(
-                    details.amount,
-                    depositToken.decimals,
-                  );
-
-                  const txHash = await writeContractAsync({
-                    address: escrowFactoryAddress,
-                    abi: escrowFactoryAbi,
-                    functionName: "createEscrowDeterministic",
-                    args: [
-                      salt,
-                      depositToken.address,
-                      amountWei,
-                      pdfHash,
-                      cid,
-                      dealDeadline,
-                      validUntil,
-                      sHash,
-                      attestation,
-                      signature,
+              if (signatureDataUrl) {
+                const stamped = await appendSignatureCertificate(buf, [
+                  {
+                    role: "Party A",
+                    name: identity.name,
+                    email: identity.email,
+                    wallet,
+                    attestationHash: attestationStructHash,
+                    signedAtUnix: Math.floor(Date.now() / 1000),
+                    signaturePngDataUrl: signatureDataUrl,
+                  },
+                ]);
+                const stampedFd = new FormData();
+                stampedFd.append(
+                  "file",
+                  new File(
+                    [
+                      new Blob([stamped as BlobPart], {
+                        type: "application/pdf",
+                      }),
                     ],
-                  });
-                  await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-                  setStage("registering");
-                  const attestationStructHash = (await publicClient.readContract({
-                    address: predicted,
-                    abi: escrowAbi,
-                    functionName: "hashAttestation",
-                    args: [attestation],
-                  })) as `0x${string}`;
-
-                  const res = await fetch("/api/contracts", {
+                    `${details.title || "contract"}-signed.pdf`,
+                    { type: "application/pdf" },
+                  ),
+                );
+                const stampedRes = await fetch("/api/ipfs", {
+                  method: "POST",
+                  body: stampedFd,
+                });
+                if (stampedRes.ok) {
+                  const { cid: signedCid } = (await stampedRes.json()) as {
+                    cid: string;
+                  };
+                  await fetch(`/api/contracts/${predicted}/signed`, {
                     method: "POST",
                     headers: { "content-type": "application/json" },
-                    body: JSON.stringify({
-                      title: details.title,
-                      counterpartyEmail: details.counterpartyEmail,
-                      counterpartyName: details.counterpartyName,
-                      amount: details.amount,
-                      pdfHash,
-                      pdfCid: cid,
-                      escrowAddress: predicted,
-                      secretHash: sHash,
-                      dealDeadline: details.dealDeadline,
-                      partyA: {
-                        wallet: address,
-                        name: identity.name,
-                        email: identity.email,
-                        attestationHash: attestationStructHash,
-                      },
-                    }),
+                    body: JSON.stringify({ signedPdfCid: signedCid }),
                   });
-                  if (!res.ok) throw new Error("Failed to save contract index");
-
-                  // Stamp Party A's Quick Sign certificate page onto a copy
-                  // of the original PDF and pin it as the off-chain audit
-                  // artifact. On-chain pdfHash stays anchored to the
-                  // original (both parties attest to the same bytes).
-                  if (signatureDataUrl) {
-                    const stamped = await appendSignatureCertificate(buf, [
-                      {
-                        role: "Party A",
-                        name: identity.name,
-                        email: identity.email,
-                        wallet: address,
-                        attestationHash: attestationStructHash,
-                        signedAtUnix: Math.floor(Date.now() / 1000),
-                        signaturePngDataUrl: signatureDataUrl,
-                      },
-                    ]);
-                    const stampedFd = new FormData();
-                    stampedFd.append(
-                      "file",
-                      new File(
-                        [
-                          new Blob([stamped as BlobPart], {
-                            type: "application/pdf",
-                          }),
-                        ],
-                        `${details.title || "contract"}-signed.pdf`,
-                        { type: "application/pdf" },
-                      ),
-                    );
-                    const stampedRes = await fetch("/api/ipfs", {
-                      method: "POST",
-                      body: stampedFd,
-                    });
-                    if (stampedRes.ok) {
-                      const { cid: signedCid } = (await stampedRes.json()) as {
-                        cid: string;
-                      };
-                      await fetch(`/api/contracts/${predicted}/signed`, {
-                        method: "POST",
-                        headers: { "content-type": "application/json" },
-                        body: JSON.stringify({ signedPdfCid: signedCid }),
-                      });
-                    }
-                  }
-
-                  onDone({
-                    escrowAddress: predicted,
-                    secret,
-                    link: shareLink(predicted, secret),
-                  });
-                } catch (err) {
-                  setError(
-                    err instanceof Error ? err.message : "Something went wrong",
-                  );
-                  setStage("error");
                 }
-              }}
+              }
+
+              onDone({
+                escrowAddress: predicted,
+                secret,
+                link: shareLink(predicted, secret),
+              });
+            } catch (err) {
+              setError(
+                err instanceof Error ? err.message : "Something went wrong",
+              );
+              setStage("error");
+            }
+          }}
+        >
+          <div className="text-left">
+            <div className="text-[14px] font-semibold">
+              {stage === "sign" && "Sign & deploy escrow"}
+              {stage === "deploying" && "Submitting tx…"}
+              {stage === "registering" && "Saving…"}
+            </div>
+            <div
+              className="mt-1 font-mono opacity-80"
+              style={{ fontSize: 11 }}
             >
-              <div className="text-left">
-                <div className="text-[14px] font-semibold">
-                  {stage === "sign" && "Sign & deploy escrow"}
-                  {stage === "deploying" && "Submitting tx…"}
-                  {stage === "registering" && "Saving…"}
-                </div>
-                <div
-                  className="mt-1 font-mono opacity-80"
-                  style={{ fontSize: 11 }}
-                >
-                  countersign(secret) + safeTransferFrom · atomic
-                </div>
-              </div>
-            </button>
-            <p
-              className="font-mono text-muted"
-              style={{ fontSize: 11, lineHeight: 1.5 }}
-            >
-              ↳ Funds release only when both wallets approve. We never custody
-              them.
-            </p>
+              countersign(secret) + safeTransferFrom · atomic
+            </div>
           </div>
-        </div>
-      )}
-    </WalletGate>
+        </button>
+        <p
+          className="font-mono text-muted"
+          style={{ fontSize: 11, lineHeight: 1.5 }}
+        >
+          ↳ Funds release only when both wallets approve. We never custody
+          them.
+        </p>
+      </div>
+    </div>
   );
+}
+
+/// Used inside the dashboard summary; pulls wallet from context so we can
+/// render outside of an explicit prop.
+export function useConnectedAccount() {
+  const { address } = useAccount();
+  return address;
 }
 
 function Summary({

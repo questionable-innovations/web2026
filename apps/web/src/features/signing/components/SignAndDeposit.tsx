@@ -163,17 +163,33 @@ function Inner({
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
 
+      const attestationStructHash = (await publicClient.readContract({
+        address: info.escrowAddress,
+        abi: escrowAbi,
+        functionName: "hashAttestation",
+        args: [attestation],
+      })) as `0x${string}`;
+
+      // Persist Party B's countersign to the off-chain index. State moves
+      // Awaiting → Active here; partyBWallet now resolves on the dashboard.
+      await fetch(`/api/contracts/${info.escrowAddress}/countersign`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          partyB: {
+            wallet,
+            name: name.trim(),
+            email: verifiedEmail!,
+            attestationHash: attestationStructHash,
+          },
+        }),
+      });
+
       // Stamp B's Quick Sign block onto the existing signed PDF (which
       // carries A's block) and re-pin. On-chain pdfHash is unchanged —
       // it was always the original; the stamped artifact is the
       // human-readable audit copy (§4.3.7).
       try {
-        const attestationStructHash = (await publicClient.readContract({
-          address: info.escrowAddress,
-          abi: escrowAbi,
-          functionName: "hashAttestation",
-          args: [attestation],
-        })) as `0x${string}`;
         const upstream = await fetch(
           `/api/contracts/${info.escrowAddress}/pdf?signed=1`,
         );

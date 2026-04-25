@@ -18,6 +18,7 @@ import {
 import { activeChain, getDepositTokenByAddress } from "@/lib/chain";
 import { erc20Abi, escrowAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
+import { isLocalhost } from "@/lib/isLocalhost";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
 import { ChainGate } from "./ChainGate";
@@ -83,6 +84,7 @@ function Inner({
   profile: Profile;
   onDone: () => void;
 }) {
+  const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
   const publicClient = usePublicClient();
   const { signTypedDataAsync } = useSignTypedData();
@@ -261,8 +263,14 @@ function Inner({
       }
 
       onDone();
-    } catch {
-      setError("An error occurred.");
+    } catch (err) {
+      setError(
+        showRawErrors
+          ? err instanceof Error
+            ? err.message
+            : "Something went wrong"
+          : "An error occurred.",
+      );
       setStage("error");
     }
   }

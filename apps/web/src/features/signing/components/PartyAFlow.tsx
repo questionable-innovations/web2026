@@ -33,6 +33,7 @@ import {
 } from "@/lib/chain";
 import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
+import { isLocalhost } from "@/lib/isLocalhost";
 import { PdfViewer } from "./PdfViewer";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
@@ -633,6 +634,7 @@ function SignStep({
   setError: (e: string | null) => void;
   onDone: (r: Result) => void;
 }) {
+  const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
   const publicClient = usePublicClient();
   const { signTypedDataAsync } = useSignTypedData();
@@ -891,8 +893,14 @@ function SignStep({
                 secret,
                 link: shareLink(predicted, secret),
               });
-            } catch {
-              setError("An error occurred.");
+            } catch (err) {
+              setError(
+                showRawErrors
+                  ? err instanceof Error
+                    ? err.message
+                    : "Something went wrong"
+                  : "An error occurred.",
+              );
               setStage("error");
             }
           }}

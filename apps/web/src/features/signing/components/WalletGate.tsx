@@ -2,9 +2,11 @@
 
 import { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
+import { useState } from "react";
 import { useAccount, useConnect } from "wagmi";
 import type { Connector } from "wagmi";
-import { usePrivy } from "@privy-io/react-auth";
+import { useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
+import { isLocalhost } from "@/lib/isLocalhost";
 
 /// Gate for any flow that requires a connected wallet. Renders a sign-in
 /// surface if the user isn't connected, then hands the address down to the
@@ -21,10 +23,16 @@ export function WalletGate({
 }) {
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending, variables, error } = useConnect();
+  const [embeddedPendingKey, setEmbeddedPendingKey] = useState<string | null>(
+    null,
+  );
+  const [embeddedError, setEmbeddedError] = useState<string | null>(null);
   const pendingConnectorUid = isPending
     ? (variables as { connector?: Connector } | undefined)?.connector?.uid
     : undefined;
   const privy = useSafePrivy();
+  const loginWithOAuth = useSafeLoginWithOAuth();
+  const showRawErrors = isLocalhost();
 
   if (isConnected && address) {
     return <>{children(address)}</>;
@@ -50,11 +58,31 @@ export function WalletGate({
       ? [
           {
             kind: "embedded" as const,
-            key: "privy",
-            name: "Email or Google",
+            key: "privy-email",
+            name: "Email",
             tag: "EMBEDDED · created on first sign-in",
-            onSelect: () => privy?.login(),
-            isPending: false,
+            onSelect: () => {
+              void runEmbeddedLogin("privy-email", async () => {
+                await privy?.login();
+              });
+            },
+            isPending: embeddedPendingKey === "privy-email",
+          },
+          {
+            kind: "embedded" as const,
+            key: "privy-google",
+            name: "Google",
+            tag: "OAUTH · sign in with Google",
+            onSelect: () => {
+              void runEmbeddedLogin("privy-google", async () => {
+                if (loginWithOAuth?.initOAuth) {
+                  await loginWithOAuth.initOAuth({ provider: "google" });
+                  return;
+                }
+                await privy?.login();
+              });
+            },
+            isPending: embeddedPendingKey === "privy-google",
           },
         ]
       : []),
@@ -118,12 +146,14 @@ export function WalletGate({
             </ul>
           )}
 
-          {error && (
+          {(error || embeddedError) && (
             <p
               className="mt-4 font-mono text-accent"
               style={{ fontSize: 11, letterSpacing: 0.04 }}
             >
-              An error occurred.
+              {showRawErrors
+                ? (embeddedError ?? error?.message ?? "An error occurred.")
+                : "An error occurred."}
             </p>
           )}
         </div>
@@ -187,6 +217,23 @@ export function WalletGate({
       </aside>
     </div>
   );
+
+  async function runEmbeddedLogin(
+    key: string,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    setEmbeddedError(null);
+    setEmbeddedPendingKey(key);
+    try {
+      await action();
+    } catch (err) {
+      setEmbeddedError(
+        err instanceof Error ? err.message : "Something went wrong",
+      );
+    } finally {
+      setEmbeddedPendingKey(null);
+    }
+  }
 }
 
 type MethodOption =
@@ -390,6 +437,14 @@ function pad2(n: number): string {
 function useSafePrivy() {
   try {
     return usePrivy();
+  } catch {
+    return null;
+  }
+}
+
+function useSafeLoginWithOAuth() {
+  try {
+    return useLoginWithOAuth();
   } catch {
     return null;
   }

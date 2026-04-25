@@ -19,15 +19,14 @@ import {
 import { activeChain, depositToken, escrowFactoryAddress } from "@/lib/chain";
 import { escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
-import { EmailVerify } from "./EmailVerify";
 import { PdfViewer } from "./PdfViewer";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
+import { ProfileGate, type Profile } from "./ProfileGate";
 import { PdfThumb, StateBadge } from "@/components/AppShell";
 
 type Stage =
   | "details"
-  | "identify"
   | "sign"
   | "deploying"
   | "registering"
@@ -43,11 +42,6 @@ type Details = {
   dealDeadline: number;
 };
 
-type Identity = {
-  name: string;
-  email: string;
-};
-
 type Result = {
   escrowAddress: `0x${string}`;
   secret: `0x${string}`;
@@ -56,7 +50,6 @@ type Result = {
 
 const STEPS: [string, Stage[]][] = [
   ["Document", ["details"]],
-  ["Terms", ["identify"]],
   ["Sign", ["sign", "deploying", "registering"]],
   ["Send", ["share"]],
 ];
@@ -70,16 +63,25 @@ export function PartyAFlow() {
       title="Sign in to seal a deal"
       blurb="DealSeal is wallet-first. Connect a wallet to upload your PDF — your signature, your deposit terms, and your reputation all anchor to it."
     >
-      {(address) => <Inner wallet={address} />}
+      {(address) => (
+        <ProfileGate wallet={address}>
+          {(profile) => <Inner wallet={address} profile={profile} />}
+        </ProfileGate>
+      )}
     </WalletGate>
   );
 }
 
-function Inner({ wallet }: { wallet: `0x${string}` }) {
+function Inner({
+  wallet,
+  profile,
+}: {
+  wallet: `0x${string}`;
+  profile: Profile;
+}) {
   const [stage, setStage] = useState<Stage>("details");
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<Details | null>(null);
-  const [identity, setIdentity] = useState<Identity | null>(null);
   const [result, setResult] = useState<Result | null>(null);
 
   const headerEyebrow =
@@ -89,8 +91,6 @@ function Inner({ wallet }: { wallet: `0x${string}` }) {
   const headline =
     stage === "details"
       ? "What are you sealing?"
-      : stage === "identify"
-      ? "Verify yourself."
       : stage === "share"
       ? `You signed. Now send it to ${details?.counterpartyName ?? "your counterparty"}.`
       : "Sign and deploy.";
@@ -107,17 +107,30 @@ function Inner({ wallet }: { wallet: `0x${string}` }) {
           </span>
           <div>
             <div className="ds-eyebrow">Signed in as</div>
-            <div className="font-mono" style={{ fontSize: 12 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.3 }}>
+              <span style={{ fontWeight: 500 }}>{profile.name}</span>
+              <span className="text-muted"> · {profile.email}</span>
+            </div>
+            <div className="font-mono text-muted" style={{ fontSize: 11 }}>
               {wallet}
             </div>
           </div>
         </div>
-        <span
-          className="font-mono uppercase text-muted"
-          style={{ fontSize: 10, letterSpacing: 1 }}
-        >
-          Wallet · {activeChain.name}
-        </span>
+        <div className="flex items-center gap-3">
+          <a
+            href="/settings"
+            className="font-mono text-accent"
+            style={{ fontSize: 10, letterSpacing: 1 }}
+          >
+            EDIT
+          </a>
+          <span
+            className="font-mono uppercase text-muted"
+            style={{ fontSize: 10, letterSpacing: 1 }}
+          >
+            {activeChain.name}
+          </span>
+        </div>
       </div>
 
       <div className="mb-8 flex items-baseline justify-between">
@@ -141,30 +154,17 @@ function Inner({ wallet }: { wallet: `0x${string}` }) {
         <DetailsStep
           onNext={(d) => {
             setDetails(d);
-            setStage("identify");
-          }}
-        />
-      )}
-
-      {stage === "identify" && details && (
-        <IdentifyStep
-          file={details.file}
-          wallet={wallet}
-          onBack={() => setStage("details")}
-          onNext={(id) => {
-            setIdentity(id);
             setStage("sign");
           }}
         />
       )}
 
       {(stage === "sign" || stage === "deploying" || stage === "registering") &&
-        details &&
-        identity && (
+        details && (
           <SignStep
             wallet={wallet}
             details={details}
-            identity={identity}
+            profile={profile}
             stage={stage}
             setStage={setStage}
             setError={setError}
@@ -186,7 +186,7 @@ function Inner({ wallet }: { wallet: `0x${string}` }) {
             type="button"
             onClick={() => {
               setError(null);
-              setStage(identity ? "sign" : details ? "identify" : "details");
+              setStage(details ? "sign" : "details");
             }}
             className="border border-rule px-4 py-2 text-sm"
           >
@@ -481,88 +481,10 @@ function DetailsStep({ onNext }: { onNext: (d: Details) => void }) {
   );
 }
 
-function IdentifyStep({
-  file,
-  wallet,
-  onBack,
-  onNext,
-}: {
-  file: File;
-  wallet: `0x${string}`;
-  onBack: () => void;
-  onNext: (id: Identity) => void;
-}) {
-  const [name, setName] = useState("");
-  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
-
-  const ready = name.trim().length > 0 && verifiedEmail !== null;
-
-  return (
-    <div className="grid gap-6" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
-      <div className="border border-rule bg-card p-3">
-        <PdfViewer file={file} />
-      </div>
-      <div className="space-y-4">
-        <div className="border border-rule bg-card p-6">
-          <div className="ds-eyebrow mb-3">Your identity</div>
-          <div
-            className="mb-4 bg-paper px-3 py-2.5 font-mono"
-            style={{
-              fontSize: 11,
-              border: "1px solid var(--color-rule)",
-              lineHeight: 1.6,
-            }}
-          >
-            <div className="text-muted">Wallet (signed in)</div>
-            <div>{wallet}</div>
-          </div>
-          <FieldLabel>Your full name</FieldLabel>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Aroha @ QInnovate"
-            className="ds-input"
-          />
-          <div style={{ height: 14 }} />
-          <FieldLabel>Your email (verified)</FieldLabel>
-          <EmailVerify onVerified={setVerifiedEmail} />
-          <p
-            className="mt-3 font-mono text-muted"
-            style={{ fontSize: 10, lineHeight: 1.5 }}
-          >
-            Name + email are committed as <em>salted hashes</em> on-chain
-            (CCLA s.229). Plaintext stays in our DB; revealed only on dispute.
-          </p>
-        </div>
-
-        <div className="flex justify-between">
-          <button
-            type="button"
-            onClick={onBack}
-            className="border border-rule px-4 py-3 text-[13px]"
-          >
-            ← Back
-          </button>
-          <button
-            type="button"
-            disabled={!ready}
-            onClick={() =>
-              onNext({ name: name.trim(), email: verifiedEmail! })
-            }
-            className="bg-ink px-5 py-3 text-[13px] text-paper disabled:opacity-50"
-          >
-            Continue to sign →
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function SignStep({
   wallet,
   details,
-  identity,
+  profile,
   stage,
   setStage,
   setError,
@@ -570,7 +492,7 @@ function SignStep({
 }: {
   wallet: `0x${string}`;
   details: Details;
-  identity: Identity;
+  profile: Profile;
   stage: Stage;
   setStage: (s: Stage) => void;
   setError: (e: string | null) => void;
@@ -595,7 +517,7 @@ function SignStep({
       <div className="space-y-4">
         <div className="border border-rule bg-card p-6">
           <div className="ds-eyebrow mb-3">Confirmation</div>
-          <Summary details={details} identity={identity} wallet={wallet} />
+          <Summary details={details} profile={profile} wallet={wallet} />
 
           <div className="mt-5">
             <FieldLabel>Your signature</FieldLabel>
@@ -655,8 +577,8 @@ function SignStep({
 
               const attestation = buildAttestation({
                 wallet,
-                name: identity.name,
-                email: identity.email,
+                name: profile.name,
+                email: profile.email,
                 nameSalt,
                 emailSalt,
                 pdfHash,
@@ -717,8 +639,8 @@ function SignStep({
                   dealDeadline: details.dealDeadline,
                   partyA: {
                     wallet,
-                    name: identity.name,
-                    email: identity.email,
+                    name: profile.name,
+                    email: profile.email,
                     attestationHash: attestationStructHash,
                   },
                 }),
@@ -729,8 +651,8 @@ function SignStep({
                 const stamped = await appendSignatureCertificate(buf, [
                   {
                     role: "Party A",
-                    name: identity.name,
-                    email: identity.email,
+                    name: profile.name,
+                    email: profile.email,
                     wallet,
                     attestationHash: attestationStructHash,
                     signedAtUnix: Math.floor(Date.now() / 1000),
@@ -814,11 +736,11 @@ export function useConnectedAccount() {
 
 function Summary({
   details,
-  identity,
+  profile,
   wallet,
 }: {
   details: Details;
-  identity: Identity;
+  profile: Profile;
   wallet: `0x${string}`;
 }) {
   return (
@@ -829,7 +751,7 @@ function Summary({
         v={`${details.counterpartyName} · ${details.counterpartyEmail}`}
       />
       <Row k="Deposit" v={`${details.amount} ${depositToken.symbol}`} />
-      <Row k="You" v={`${identity.name} · ${identity.email}`} />
+      <Row k="You" v={`${profile.name} · ${profile.email}`} />
       <Row k="Wallet" v={`${wallet.slice(0, 6)}…${wallet.slice(-4)}`} />
     </dl>
   );

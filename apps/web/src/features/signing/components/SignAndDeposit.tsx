@@ -17,9 +17,9 @@ import {
 import { activeChain, depositToken } from "@/lib/chain";
 import { erc20Abi, escrowAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
-import { EmailVerify } from "./EmailVerify";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
+import { ProfileGate, type Profile } from "./ProfileGate";
 
 type ContractInfo = {
   escrowAddress: `0x${string}`;
@@ -49,7 +49,17 @@ export function SignAndPay({
   return (
     <WalletGate>
       {(address) => (
-        <Inner info={info} secret={secret} wallet={address} onDone={onDone} />
+        <ProfileGate wallet={address}>
+          {(profile) => (
+            <Inner
+              info={info}
+              secret={secret}
+              wallet={address}
+              profile={profile}
+              onDone={onDone}
+            />
+          )}
+        </ProfileGate>
       )}
     </WalletGate>
   );
@@ -59,11 +69,13 @@ function Inner({
   info,
   secret,
   wallet,
+  profile,
   onDone,
 }: {
   info: ContractInfo;
   secret: `0x${string}`;
   wallet: `0x${string}`;
+  profile: Profile;
   onDone: () => void;
 }) {
   const chainId = activeChain.id;
@@ -71,8 +83,6 @@ function Inner({
   const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useWriteContract();
 
-  const [name, setName] = useState("");
-  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
   const [confirm, setConfirm] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -110,8 +120,6 @@ function Inner({
   const confirmMatches = confirm === wholeAmount;
 
   const ready =
-    name.trim().length > 0 &&
-    verifiedEmail !== null &&
     inkDataUrl !== null &&
     onchainAmount !== undefined &&
     !insufficient &&
@@ -141,8 +149,8 @@ function Inner({
       const emailSalt = newSalt();
       const attestation = buildAttestation({
         wallet,
-        name: name.trim(),
-        email: verifiedEmail!,
+        name: profile.name,
+        email: profile.email,
         nameSalt,
         emailSalt,
         pdfHash: info.pdfHash,
@@ -178,8 +186,8 @@ function Inner({
         body: JSON.stringify({
           partyB: {
             wallet,
-            name: name.trim(),
-            email: verifiedEmail!,
+            name: profile.name,
+            email: profile.email,
             attestationHash: attestationStructHash,
           },
         }),
@@ -198,8 +206,8 @@ function Inner({
           const stamped = await appendSignatureCertificate(buf, [
             {
               role: "Party B",
-              name: name.trim(),
-              email: verifiedEmail!,
+              name: profile.name,
+              email: profile.email,
               wallet,
               attestationHash: attestationStructHash,
               signedAtUnix: Math.floor(Date.now() / 1000),
@@ -323,25 +331,34 @@ function Inner({
         </div>
       </div>
 
-      <BInput
-        label="Your full name"
-        value={name}
-        onChange={setName}
-        placeholder="Bob Tomlinson"
-      />
-      <div>
-        <span
-          className="mb-1.5 block font-mono uppercase"
+      <div
+        className="p-4"
+        style={{ background: fieldBg, border: fieldBorder }}
+      >
+        <div
+          className="mb-2 flex items-baseline justify-between font-mono uppercase"
           style={{
             fontSize: 10,
             letterSpacing: 1,
             color: "rgba(255,255,255,0.6)",
           }}
         >
-          Your email (verified for the audit certificate)
-        </span>
-        <div className="rounded-sm bg-paper p-3 text-ink">
-          <EmailVerify onVerified={setVerifiedEmail} />
+          <span>Signing as</span>
+          <a
+            href="/settings"
+            style={{ color: "var(--color-accent)" }}
+          >
+            EDIT
+          </a>
+        </div>
+        <div style={{ fontSize: 14, color: "var(--color-paper)" }}>
+          {profile.name}
+        </div>
+        <div
+          className="mt-0.5 font-mono"
+          style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}
+        >
+          {profile.email} · verified
         </div>
       </div>
 
@@ -447,48 +464,6 @@ function Inner({
         {info.partyAName ?? "Party A"} approve. We never custody them.
       </p>
     </div>
-  );
-}
-
-function BInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
-  return (
-    <label className="block">
-      <span
-        className="mb-1.5 block font-mono uppercase"
-        style={{
-          fontSize: 10,
-          letterSpacing: 1,
-          color: "rgba(255,255,255,0.6)",
-        }}
-      >
-        {label}
-      </span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3.5 py-3 outline-none"
-        style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.14)",
-          color: "var(--color-paper)",
-          fontSize: 14,
-        }}
-      />
-    </label>
   );
 }
 

@@ -69,20 +69,21 @@ contract EscrowTest is Test {
         return keccak256(abi.encodePacked("\x19\x01", sep, structHash));
     }
 
-    /// @dev We deploy the clone manually (not via factory) so the test can
-    ///      pre-sign EIP-712 attestations bound to the eventual address —
-    ///      `factory.createEscrow` requires the signed attestation up-front,
-    ///      and the domain separator depends on the clone's address.
+    /// @dev Deploys via the factory using a deterministic salt so the test
+    ///      can pre-sign EIP-712 attestations bound to the predicted address.
+    ///      Going through the factory exercises `isEscrow` registration —
+    ///      important because partyB countersign now calls back into it.
     function _createWithSig() internal returns (Escrow e) {
         bytes32 pdfHash = keccak256("pdf-bytes");
-        e = Escrow(_cloneEscrow());
+        bytes32 salt = keccak256(abi.encodePacked("salt", block.number));
+        address predicted = factory.predictAddress(salt);
 
         (Escrow.Attestation memory a, bytes memory sig) =
-            _attest(alice, address(e), pdfHash, 0);
+            _attest(alice, predicted, pdfHash, 0);
 
         vm.prank(alice.addr);
-        e.initialize(
-            alice.addr,
+        factory.createEscrowDeterministic(
+            salt,
             token,
             1_000 ether,
             pdfHash,
@@ -93,21 +94,7 @@ contract EscrowTest is Test {
             a,
             sig
         );
-    }
-
-    function _cloneEscrow() internal returns (address out) {
-        // EIP-1167 minimal clone of `impl`, deployed via the same Clones lib
-        // the factory uses. Bypasses the factory just for tests so we can
-        // pre-sign attestations bound to the eventual address.
-        bytes20 target = bytes20(address(impl));
-        assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
-            mstore(add(ptr, 0x14), target)
-            mstore(add(ptr, 0x28), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
-            out := create(0, ptr, 0x37)
-        }
-        require(out != address(0), "clone failed");
+        e = Escrow(predicted);
     }
 
     function test_happyPath() public {
@@ -128,7 +115,89 @@ contract EscrowTest is Test {
 
         e.withdraw();
 
-        assertEq(uint8(e.state()), uint8(Escrow.State.Released));
+        assertEq(uint8(e.state()), uint8(Escrow.State.Closed));
+        assertEq(token.balanceOf(alice.addr), 1_000 ether);
+
+        // partyB is indexed too — reputation aggregates over both sides.
+        assertEq(factory.partyEscrowCount(bob.addr), 1);
+        assertEq(factory.partyEscrowCount(alice.addr), 1);
+    }
+
+    function test_recordCountersign_onlyEscrow() public {
+        // External callers can't poison the per-party index.
+        vm.expectRevert(EscrowFactory.NotEscrow.selector);
+        factory.recordCountersign(bob.addr);
+    }
+
+    function test_initRejectsBadParams() public {
+        bytes32 pdfHash = keccak256("pdf-bytes");
+        bytes32 salt = keccak256("salt-bad");
+        address predicted = factory.predictAddress(salt);
+        (Escrow.Attestation memory a, bytes memory sig) =
+            _attest(alice, predicted, pdfHash, 0);
+
+        // Zero amount is rejected.
+        vm.prank(alice.addr);
+        vm.expectRevert(Escrow.InvalidInit.selector);
+        factory.createEscrowDeterministic(
+            salt,
+            token,
+            0,
+            pdfHash,
+            "bafy...",
+            uint64(block.timestamp + 30 days),
+            uint64(block.timestamp + 7 days),
+            keccak256(abi.encodePacked(SECRET)),
+            a,
+            sig
+        );
+
+        // validUntil > deadline is rejected.
+        salt = keccak256("salt-bad-2");
+        predicted = factory.predictAddress(salt);
+        (a, sig) = _attest(alice, predicted, pdfHash, 0);
+        vm.prank(alice.addr);
+        vm.expectRevert(Escrow.InvalidInit.selector);
+        factory.createEscrowDeterministic(
+            salt,
+            token,
+            1_000 ether,
+            pdfHash,
+            "bafy...",
+            uint64(block.timestamp + 7 days),
+            uint64(block.timestamp + 30 days),
+            keccak256(abi.encodePacked(SECRET)),
+            a,
+            sig
+        );
+    }
+
+    function test_cancelDispute_returnsToActive() public {
+        Escrow e = _createWithSig();
+        bytes32 pdfHash = keccak256("pdf-bytes");
+        (Escrow.Attestation memory aB, bytes memory sigB) =
+            _attest(bob, address(e), pdfHash, 0);
+
+        vm.startPrank(bob.addr);
+        token.approve(address(e), 1_000 ether);
+        e.countersign(SECRET, aB, sigB);
+        e.flagDispute("partial work");
+        // Only the disputer can cancel.
+        vm.stopPrank();
+        vm.expectRevert(Escrow.NotDisputer.selector);
+        vm.prank(alice.addr);
+        e.cancelDispute();
+
+        vm.prank(bob.addr);
+        e.cancelDispute();
+        assertEq(uint8(e.state()), uint8(Escrow.State.Active));
+
+        // Release path works again after un-disputing.
+        vm.prank(alice.addr);
+        e.proposeRelease();
+        vm.prank(bob.addr);
+        e.approveRelease();
+        e.withdraw();
         assertEq(token.balanceOf(alice.addr), 1_000 ether);
     }
 
@@ -202,6 +271,7 @@ contract EscrowTest is Test {
         vm.prank(bob.addr);
         e.rescue();
         assertEq(token.balanceOf(bob.addr) - bobBefore, 1_000 ether);
+        assertEq(uint8(e.state()), uint8(Escrow.State.Closed));
     }
 
     function test_cannotApproveOwnProposal() public {

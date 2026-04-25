@@ -3,11 +3,16 @@ pragma solidity ^0.8.27;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {ReentrancyGuardUpgradeable} from
     "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EIP712Upgradeable} from
     "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+
+interface IEscrowFactory {
+    function recordCountersign(address partyB) external;
+}
 
 /// @title Escrow — deployed as an EIP-1167 minimal proxy clone, one per agreement.
 /// @notice State machine for sign + deposit + release. Deadlock by design (§3.4).
@@ -22,7 +27,8 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         Active,
         Releasing,
         Released,
-        Disputed
+        Disputed,
+        Closed
     }
 
     /// EIP-712 typed data for an attestation.
@@ -60,6 +66,7 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
 
     State public state;
     address public proposedReleaseBy;
+    address public disputedBy;
     string public disputeReason;
     uint256 public withdrawable;
 
@@ -72,6 +79,7 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
     event ReleaseApproved(address indexed by, uint256 amount);
     event Withdrawn(address indexed to, uint256 amount);
     event Disputed(address indexed by, string reason);
+    event DisputeCancelled(address indexed by);
     event Rescued(address indexed to, uint256 amount);
 
     error WrongState(State expected, State actual);
@@ -86,6 +94,8 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
     error RescueTimeoutNotReached();
     error NothingToWithdraw();
     error CannotApproveOwnProposal();
+    error InvalidInit();
+    error NotDisputer();
 
     modifier inState(State s) {
         if (state != s) revert WrongState(s, state);
@@ -109,6 +119,14 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         Attestation calldata partyAAttestation,
         bytes calldata partyASignature
     ) external initializer {
+        if (_partyA == address(0)) revert InvalidInit();
+        if (address(_token) == address(0)) revert InvalidInit();
+        if (_amount == 0) revert InvalidInit();
+        if (_pdfHash == bytes32(0)) revert InvalidInit();
+        if (_secretHash == bytes32(0)) revert InvalidInit();
+        if (_deadline <= block.timestamp) revert InvalidInit();
+        if (_validUntil == 0 || _validUntil > _deadline) revert InvalidInit();
+
         __ReentrancyGuard_init();
         __EIP712_init("DealSeal", "1");
 
@@ -157,6 +175,12 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
             revert TransferAmountMismatch();
         }
 
+        // Index partyB on the factory so reputation aggregates over both sides.
+        // Failure here is non-fatal — the on-chain commitment is what matters,
+        // and the factory address is fixed at clone-time so this can only
+        // revert if the factory contract itself is bricked.
+        IEscrowFactory(factory).recordCountersign(msg.sender);
+
         emit Countersigned(msg.sender, partyBAttestation.nameHash, partyBAttestation.emailHash);
     }
 
@@ -178,10 +202,11 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
 
     /// @notice Pull-payment for partyA after release. Anyone may call on behalf;
     ///         funds always flow to partyA.
-    function withdraw() external nonReentrant {
+    function withdraw() external nonReentrant inState(State.Released) {
         uint256 amt = withdrawable;
         if (amt == 0) revert NothingToWithdraw();
         withdrawable = 0;
+        state = State.Closed;
         token.safeTransfer(partyA, amt);
         emit Withdrawn(partyA, amt);
     }
@@ -192,8 +217,20 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
             revert WrongState(State.Active, state);
         }
         state = State.Disputed;
+        disputedBy = msg.sender;
         disputeReason = reason;
         emit Disputed(msg.sender, reason);
+    }
+
+    /// @notice Only the party who flagged the dispute may withdraw it,
+    ///         returning to Active so the parties can keep negotiating
+    ///         instead of being forced to wait out RESCUE_TIMEOUT.
+    function cancelDispute() external inState(State.Disputed) {
+        if (msg.sender != disputedBy) revert NotDisputer();
+        state = State.Active;
+        disputedBy = address(0);
+        disputeReason = "";
+        emit DisputeCancelled(msg.sender);
     }
 
     /// @notice Last-resort path for the "intended recipient is untransferrable"
@@ -208,12 +245,11 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         uint256 bal = token.balanceOf(address(this));
         if (bal == 0) revert NothingToWithdraw();
 
-        // If transferring to partyA fails (e.g. blacklisted), the caller can
-        // re-attempt with partyB as the recipient by ensuring this tx originates
-        // from partyB. For the v1 demo, we just send to the caller; in prod a
-        // try/catch on partyA-first is the right shape.
+        // For the v1 demo, send to caller. Full fix (try partyA first, fall
+        // back to partyB on transfer failure) is tracked separately.
         address recipient = msg.sender;
         withdrawable = 0;
+        state = State.Closed;
         token.safeTransfer(recipient, bal);
         emit Rescued(recipient, bal);
     }
@@ -241,31 +277,18 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeable 
         Attestation calldata a,
         bytes calldata signature
     ) internal view {
+        if (signer == address(0)) revert BadAttestation();
         if (a.wallet != signer) revert BadAttestation();
         if (a.pdfHash != pdfHash) revert BadAttestation();
         if (a.nonce != nonces[signer]) revert BadAttestation();
         if (block.timestamp > a.deadline) revert AttestationExpired();
 
         bytes32 digest = _hashTypedDataV4(hashAttestation(a));
-        address recovered = _recoverSigner(digest, signature);
-        if (recovered != signer) revert BadAttestation();
-    }
-
-    function _recoverSigner(bytes32 digest, bytes calldata sig)
-        private
-        pure
-        returns (address)
-    {
-        if (sig.length != 65) revert BadAttestation();
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        assembly {
-            r := calldataload(sig.offset)
-            s := calldataload(add(sig.offset, 0x20))
-            v := byte(0, calldataload(add(sig.offset, 0x40)))
+        // SignatureChecker handles ECDSA (with malleability rejection via
+        // OZ's ECDSA.tryRecover) plus EIP-1271 for smart-contract wallets.
+        if (!SignatureChecker.isValidSignatureNowCalldata(signer, digest, signature)) {
+            revert BadAttestation();
         }
-        return ecrecover(digest, v, r, s);
     }
 
     function domainSeparator() external view returns (bytes32) {

@@ -14,16 +14,27 @@ contract EscrowFactory {
 
     address[] public allEscrows;
     mapping(address => address[]) public escrowsByParty;
+    mapping(address => bool) public isEscrow;
 
     event EscrowCreated(
         address indexed escrow, address indexed partyA, IERC20 indexed token, uint256 amount
     );
+    event EscrowCountersigned(address indexed escrow, address indexed partyB);
+
+    error NotEscrow();
 
     constructor(address _implementation) {
         implementation = _implementation;
     }
 
     /// @notice Deploy a new Escrow clone and initialize it atomically.
+    /// @dev Deterministic by design: the EIP-712 domain separator depends on
+    ///      the verifying contract address, so partyA needs to predict the
+    ///      clone address (`predictAddress(salt)`) before signing the
+    ///      attestation. A non-deterministic counterpart is omitted because
+    ///      it would force the signature to be produced *after* deployment,
+    ///      which doesn't match the one-tx flow.
+    /// @param salt Random 32 bytes; client-side `crypto.getRandomValues`.
     /// @param token Deposit token (e.g. dNZD). Immutable on the clone.
     /// @param amount Deposit amount in token's smallest unit.
     /// @param pdfHash sha256 of the PDF bytes pinned to IPFS.
@@ -32,37 +43,7 @@ contract EscrowFactory {
     /// @param validUntil URL-link expiry; after this, countersign reverts.
     /// @param secretHash keccak256(secret) — the URL fragment is `#<secret>`.
     /// @param partyAAttestation EIP-712 typed-data attestation from partyA.
-    /// @param partyASignature 65-byte ECDSA signature over the attestation.
-    function createEscrow(
-        IERC20 token,
-        uint256 amount,
-        bytes32 pdfHash,
-        string calldata pdfCid,
-        uint64 dealDeadline,
-        uint64 validUntil,
-        bytes32 secretHash,
-        Escrow.Attestation calldata partyAAttestation,
-        bytes calldata partyASignature
-    ) external returns (address escrow) {
-        escrow = Clones.clone(implementation);
-        _init(
-            escrow,
-            token,
-            amount,
-            pdfHash,
-            pdfCid,
-            dealDeadline,
-            validUntil,
-            secretHash,
-            partyAAttestation,
-            partyASignature
-        );
-    }
-
-    /// @notice Deterministic counterpart used by the web client: Party A predicts
-    /// the clone address with `predictAddress(salt)`, EIP-712-signs an attestation
-    /// bound to that address, then submits the tx. Avoids the chicken-and-egg of
-    /// "the domain separator depends on the address that doesn't exist yet."
+    /// @param partyASignature ECDSA signature (or EIP-1271 sig for smart wallets).
     function createEscrowDeterministic(
         bytes32 salt,
         IERC20 token,
@@ -76,32 +57,10 @@ contract EscrowFactory {
         bytes calldata partyASignature
     ) external returns (address escrow) {
         escrow = Clones.cloneDeterministic(implementation, salt);
-        _init(
-            escrow,
-            token,
-            amount,
-            pdfHash,
-            pdfCid,
-            dealDeadline,
-            validUntil,
-            secretHash,
-            partyAAttestation,
-            partyASignature
-        );
-    }
+        isEscrow[escrow] = true;
+        allEscrows.push(escrow);
+        escrowsByParty[msg.sender].push(escrow);
 
-    function _init(
-        address escrow,
-        IERC20 token,
-        uint256 amount,
-        bytes32 pdfHash,
-        string calldata pdfCid,
-        uint64 dealDeadline,
-        uint64 validUntil,
-        bytes32 secretHash,
-        Escrow.Attestation calldata partyAAttestation,
-        bytes calldata partyASignature
-    ) internal {
         Escrow(escrow).initialize(
             msg.sender,
             token,
@@ -114,9 +73,17 @@ contract EscrowFactory {
             partyAAttestation,
             partyASignature
         );
-        allEscrows.push(escrow);
-        escrowsByParty[msg.sender].push(escrow);
         emit EscrowCreated(escrow, msg.sender, token, amount);
+    }
+
+    /// @notice Called by an Escrow clone when partyB countersigns, so the
+    ///         reputation aggregator can index deals against both sides.
+    ///         Auth'd by `isEscrow[msg.sender]` — only clones we deployed
+    ///         can write into our index.
+    function recordCountersign(address partyB) external {
+        if (!isEscrow[msg.sender]) revert NotEscrow();
+        escrowsByParty[partyB].push(msg.sender);
+        emit EscrowCountersigned(msg.sender, partyB);
     }
 
     function escrowCount() external view returns (uint256) {

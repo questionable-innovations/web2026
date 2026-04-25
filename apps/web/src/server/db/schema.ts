@@ -38,3 +38,15 @@ export const emailOtps = sqliteTable("email_otps", {
   codeHash: text("code_hash").notNull(),
   expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
 });
+
+export const userProfiles = sqliteTable("user_profiles", {
+  wallet: text("wallet").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});

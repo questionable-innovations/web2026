@@ -8,7 +8,7 @@ const chain = id === 43114 ? avalanche : avalancheFuji;
 const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL;
 
 /// Server-side viem client. Used by API routes to verify that on-chain state
-/// matches what a client claims before persisting to the off-chain index —
+/// matches what a client claims before persisting to the off-chain index -
 /// without this, anyone with an escrow address could POST forged metadata.
 export const serverPublicClient = createPublicClient({
   chain,
@@ -116,14 +116,14 @@ export async function readEscrow(
   ]);
 
   // Be strict: an out-of-range state means the contract has been upgraded
-  // and this server is stale — fail loudly rather than silently mislabeling
+  // and this server is stale - fail loudly rather than silently mislabeling
   // the deal as "Draft".
   const stateName = STATE_NAMES[stateNum];
   if (!stateName) {
     throw new Error(`unknown escrow state ${stateNum}`);
   }
 
-  // Reject clones that didn't come from our configured factory — without
+  // Reject clones that didn't come from our configured factory - without
   // this, a bystander could deploy their own escrow with the same ABI
   // shape and pass every other on-chain check.
   if (

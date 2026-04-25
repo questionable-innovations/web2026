@@ -12,10 +12,10 @@ export function tierOf(amountNzd: number): ValueTier {
 }
 
 export const TIER_LABEL: Record<ValueTier, string> = {
-  0: "—",
+  0: "-",
   1: "Under $1k",
-  2: "$1k – $10k",
-  3: "$10k – $100k",
+  2: "$1k - $10k",
+  3: "$10k - $100k",
   4: "$100k+",
 };
 

@@ -8,7 +8,7 @@ import {
 } from "@/lib/ens";
 
 /// Thin proxy in front of mainnet ENS resolution. The frontend never talks to
-/// mainnet directly — it goes through this route so we get one shared cache,
+/// mainnet directly - it goes through this route so we get one shared cache,
 /// one place to swap the RPC, and so the explorer can ask for a full profile
 /// (avatar + text records) without each component re-implementing it.
 ///

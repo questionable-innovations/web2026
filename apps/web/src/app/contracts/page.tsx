@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { useAccount } from "wagmi";
 import { PageShell, StateBadge } from "@/components/AppShell";
 import { WalletGate } from "@/features/signing/components/WalletGate";
@@ -23,7 +24,7 @@ export default function ContractsPage() {
       <div className="px-9 py-8">
         <WalletGate
           title="Sign in to see your contracts"
-          blurb="Your contracts list is filtered to the wallet you sign in with — both deals you initiated and deals where you're the counterparty."
+          blurb="Your contracts list is filtered to the wallet you sign in with: both deals you initiated and deals where you're the counterparty."
         >
           {(address) => <Inner wallet={address} />}
         </WalletGate>
@@ -135,8 +136,9 @@ function Inner({ wallet }: { wallet: `0x${string}` }) {
         {!loading && rows.length === 0 && (
           <div className="px-6 py-8 text-sm text-muted">
             No contracts yet for this wallet.{" "}
-            <Link className="text-accent" href="/new">
-              Create one →
+            <Link className="inline-flex items-center gap-1 text-accent" href="/new">
+              Create one
+              <ArrowRight size={12} />
             </Link>
           </div>
         )}
@@ -175,10 +177,11 @@ function Inner({ wallet }: { wallet: `0x${string}` }) {
                 {formatDate(r.createdAt)}
               </span>
               <span
-                className="text-right font-mono text-accent"
+                className="inline-flex items-center justify-end gap-1 text-right font-mono text-accent"
                 style={{ fontSize: 11 }}
               >
-                {isPartyA ? "YOUR DEAL →" : "SIGNED →"}
+                {isPartyA ? "YOUR DEAL" : "SIGNED"}
+                <ArrowRight size={12} />
               </span>
             </Link>
           );

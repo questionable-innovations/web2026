@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  CornerDownRight,
+  Flag,
+} from "lucide-react";
+import {
   useAccount,
   usePublicClient,
   useWriteContract,
@@ -316,28 +324,22 @@ function Inner({
       {status.state === "Active" && (
         <Banner tone="muted">
           The deposit is sitting in escrow. Either party can propose release
-          when the work is done — the other side then approves.
+          when the work is done; the other side then approves.
         </Banner>
       )}
       {status.state === "Disputed" && (
-        <Banner tone="alert">
-          A dispute is on record by{" "}
-          {status.disputedBy?.slice(0, 6)}…{status.disputedBy?.slice(-4)}.
-          Funds stay in escrow until it&apos;s cancelled.
-          {status.disputeReason && (
-            <>
-              <br />
-              <span className="font-mono" style={{ fontSize: 11 }}>
-                reason: {status.disputeReason}
-              </span>
-            </>
-          )}
-        </Banner>
+        <DisputeBanner
+          disputedBy={status.disputedBy}
+          reason={status.disputeReason}
+          escrowAddress={escrowAddress}
+          hasAuditCert={Boolean(pinnedCid)}
+          hasSignedPdf={Boolean(status.signedPdfCid)}
+        />
       )}
       {status.state === "Released" && (
         <Banner tone="ok">
           Both parties approved. {status.partyA.name ?? "Party A"} can now
-          withdraw the funds — anyone may trigger the pull.
+          withdraw the funds; anyone may trigger the pull.
         </Banner>
       )}
       {status.state === "Closed" && (
@@ -353,7 +355,7 @@ function Inner({
         <div>
           <div className="border border-rule bg-card p-7">
             <div className="ds-eyebrow mb-4">
-              Approvals — {countApprovals(approvedA, approvedB)} of 2
+              Approvals · {countApprovals(approvedA, approvedB)} of 2
             </div>
 
             <div className="grid grid-cols-2 gap-3.5">
@@ -418,14 +420,30 @@ function Inner({
 
             {showDispute && (
               <div
-                className="mt-4 border border-rule bg-paper p-4"
-                style={{ borderColor: "var(--color-rule)" }}
+                className="mt-4 border border-accent bg-paper p-4"
               >
                 <div
-                  className="mb-2 font-mono uppercase text-muted"
+                  className="mb-1 font-mono uppercase text-accent"
                   style={{ fontSize: 10, letterSpacing: 1 }}
                 >
-                  Dispute reason (recorded on-chain)
+                  Flag a dispute · funds freeze
+                </div>
+                <p
+                  className="mb-3 leading-relaxed text-ink/80"
+                  style={{ fontSize: 13 }}
+                >
+                  DealSeal does not arbitrate. Flagging a dispute keeps the
+                  funds in escrow and records the disagreement on-chain. You
+                  and your counterparty resolve it the same way you&apos;d
+                  resolve any commercial dispute (negotiation, mediation,
+                  Disputes Tribunal, District Court). The signed PDF and
+                  audit certificate below are your evidence.
+                </p>
+                <div
+                  className="mb-1.5 font-mono uppercase text-muted"
+                  style={{ fontSize: 10, letterSpacing: 1 }}
+                >
+                  Reason (recorded on-chain · visible in reputation)
                 </div>
                 <textarea
                   value={disputeReason}
@@ -433,11 +451,11 @@ function Inner({
                   rows={3}
                   className="w-full bg-paper p-2 text-sm"
                   style={{ border: "1px solid var(--color-rule)" }}
-                  placeholder="e.g. work not delivered as agreed in §3"
+                  placeholder="e.g. deliverable §3 not met; see exhibits in lawyer's letter"
                 />
                 <div className="mt-2 flex gap-2">
                   <ActionButton
-                    label="Submit dispute"
+                    label="Freeze funds & flag dispute"
                     primary
                     pending={stage === "disputing"}
                     onClick={onDispute}
@@ -505,7 +523,8 @@ function Inner({
                     color: "rgba(255,255,255,0.7)",
                   }}
                 >
-                  → {status.partyA.wallet.slice(0, 6)}…
+                  <ArrowRight size={11} className="inline-block mr-1 align-text-bottom" />
+                  {status.partyA.wallet.slice(0, 6)}…
                   {status.partyA.wallet.slice(-4)} (Party A)
                 </div>
               </div>
@@ -529,7 +548,10 @@ function Inner({
                       className="text-accent"
                       style={{ fontSize: 12 }}
                     >
-                      Download PDF →
+                      <span className="inline-flex items-center gap-1.5">
+                        Download PDF
+                        <ArrowRight size={12} />
+                      </span>
                     </a>
                     {pinnedCid && (
                       <div
@@ -559,7 +581,8 @@ function Inner({
             className="mt-4 font-mono text-muted"
             style={{ fontSize: 11, lineHeight: 1.6 }}
           >
-            ↳ Connected as {account.address?.slice(0, 6)}…
+            <CornerDownRight size={11} className="inline-block mr-1 align-text-bottom" />
+            Connected as {account.address?.slice(0, 6)}…
             {account.address?.slice(-4)} · role {abbreviateRole(role)}.
           </div>
         </div>
@@ -604,7 +627,7 @@ function Inner({
               </div>
               <div>
                 <span className="text-ink">To</span> &nbsp;&nbsp;&nbsp;
-                {status.partyB?.email ?? "—"}
+                {status.partyB?.email ?? "-"}
               </div>
               <div>
                 <span className="text-ink">Subj</span> &nbsp;Release $
@@ -627,14 +650,15 @@ function Inner({
                 placed in escrow.
                 <br />
                 <br />
-                If the work is done, approve below — one tap, no wallet
+                If the work is done, approve below: one tap, no wallet
                 hunt.
               </div>
               <a
                 href={`/c/${escrowAddress}/release`}
-                className="mt-4 inline-block w-full bg-accent px-4 py-3.5 text-center font-semibold text-white"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 bg-accent px-4 py-3.5 font-semibold text-white"
               >
-                Approve release →
+                Approve release
+                <ArrowRight size={14} />
               </a>
               <div
                 className="mt-2.5 font-mono text-muted"
@@ -655,13 +679,13 @@ function headline(state: ReleaseStatus["state"]): string {
   switch (state) {
     case "Draft":
     case "AwaitingCounterparty":
-      return "Awaiting countersign — no release yet.";
+      return "Awaiting countersign · no release yet.";
     case "Active":
       return "Both wallets must approve.";
     case "Releasing":
       return "Awaiting counterparty approval.";
     case "Released":
-      return "Approved — ready to withdraw.";
+      return "Approved · ready to withdraw.";
     case "Closed":
       return "Funds released.";
     case "Disputed":
@@ -675,7 +699,7 @@ function abbreviateRole(role: "A" | "B" | "observer" | null): string {
   if (role === "A") return "Party A";
   if (role === "B") return "Party B";
   if (role === "observer") return "observer";
-  return "—";
+  return "-";
 }
 
 function countApprovals(a: boolean, b: boolean): number {
@@ -707,20 +731,21 @@ function PartyCard({
         }}
       >
         <div
-          className="mb-2 font-mono uppercase"
+          className="mb-2 inline-flex items-center gap-1.5 font-mono uppercase"
           style={{
             fontSize: 10,
             letterSpacing: 1,
             color: "var(--color-green)",
           }}
         >
-          ✓ {label} approved {youAre ? "(you)" : ""}
+          <Check size={11} strokeWidth={2.5} />
+          {label} approved {youAre ? "(you)" : ""}
         </div>
         <div
           className="font-serif"
           style={{ fontSize: 22, lineHeight: 1.1 }}
         >
-          {name ?? "—"}
+          {name ?? "-"}
         </div>
         {wallet && (
           <div
@@ -751,7 +776,7 @@ function PartyCard({
         className="font-serif"
         style={{ fontSize: 22, lineHeight: 1.1 }}
       >
-        {name ?? "—"}
+        {name ?? "-"}
       </div>
       {wallet && (
         <div
@@ -761,6 +786,122 @@ function PartyCard({
           {wallet.slice(0, 6)}…{wallet.slice(-4)}
         </div>
       )}
+    </div>
+  );
+}
+
+function DisputeBanner({
+  disputedBy,
+  reason,
+  escrowAddress,
+  hasAuditCert,
+  hasSignedPdf,
+}: {
+  disputedBy: `0x${string}` | null;
+  reason: string | null;
+  escrowAddress: string;
+  hasAuditCert: boolean;
+  hasSignedPdf: boolean;
+}) {
+  return (
+    <div
+      className="border border-accent bg-paper px-5 py-4"
+      style={{ borderLeftWidth: 3 }}
+    >
+      <div
+        className="inline-flex items-center gap-2 font-mono uppercase text-accent"
+        style={{ fontSize: 11, letterSpacing: 2 }}
+      >
+        <Flag size={12} strokeWidth={2.2} />
+        Dispute on record · funds frozen
+      </div>
+      <p
+        className="mt-2 leading-relaxed text-ink"
+        style={{ fontSize: 14 }}
+      >
+        Flagged by{" "}
+        <span className="font-mono">
+          {disputedBy?.slice(0, 6)}…{disputedBy?.slice(-4)}
+        </span>
+        . Neither side can release the deposit until the flagging party
+        cancels the dispute, or you both agree.
+      </p>
+      <p
+        className="mt-2 leading-relaxed text-ink/75"
+        style={{ fontSize: 13 }}
+      >
+        <strong>DealSeal does not adjudicate.</strong> Disputes are resolved
+        through the same channels as any commercial disagreement: direct
+        negotiation, mediation, the Disputes Tribunal (claims under
+        $30,000), or the District Court. We hold the funds and produce the
+        evidence; the legal system decides who&apos;s right.
+      </p>
+
+      {reason && (
+        <div
+          className="mt-3 border border-rule bg-card px-3.5 py-2.5 font-mono"
+          style={{ fontSize: 11, lineHeight: 1.6 }}
+        >
+          <span className="text-muted">on-chain reason:</span> {reason}
+        </div>
+      )}
+
+      <div className="mt-4">
+        <div
+          className="ds-eyebrow mb-2"
+          style={{ color: "var(--color-accent)" }}
+        >
+          Evidence pack
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          {hasSignedPdf && (
+            <a
+              href={`/api/contracts/${escrowAddress}/pdf?signed=1`}
+              target="_blank"
+              rel="noreferrer"
+              className="border border-ink px-3 py-2 text-ink"
+              style={{ fontSize: 12 }}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <ArrowDown size={12} />
+                Signed PDF
+              </span>
+            </a>
+          )}
+          <a
+            href={`/api/contracts/${escrowAddress}/certificate`}
+            target="_blank"
+            rel="noreferrer"
+            className="border border-ink px-3 py-2 text-ink"
+            style={{ fontSize: 12 }}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <ArrowDown size={12} />
+              Audit certificate {hasAuditCert ? "(IPFS-pinned)" : ""}
+            </span>
+          </a>
+          <a
+            href={`https://testnet.snowtrace.io/address/${escrowAddress}`}
+            target="_blank"
+            rel="noreferrer"
+            className="border border-ink px-3 py-2 text-ink"
+            style={{ fontSize: 12 }}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <ArrowUpRight size={12} />
+              On-chain history
+            </span>
+          </a>
+        </div>
+        <p
+          className="mt-2.5 font-mono text-muted"
+          style={{ fontSize: 11, lineHeight: 1.6 }}
+        >
+          Hand these to your lawyer. The signed PDF carries both
+          signatures; the certificate links each signer&apos;s identity to
+          their wallet, EIP-712 signature, and the on-chain tx history.
+        </p>
+      </div>
     </div>
   );
 }
@@ -796,7 +937,10 @@ function CidRow({
           className="font-mono uppercase text-accent"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
-          Open ↗
+          <span className="inline-flex items-center gap-1">
+            Open
+            <ArrowUpRight size={11} />
+          </span>
         </a>
       </div>
       <button

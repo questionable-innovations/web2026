@@ -32,7 +32,7 @@ export function AppNav({
   active,
   wallet: walletProp,
 }: {
-  active?: "contracts" | "create" | "reputation" | "settings";
+  active?: "contracts" | "create" | "reputation" | "settings" | "admin";
   wallet?: string;
 }) {
   const { address } = useAccount();
@@ -45,7 +45,7 @@ export function AppNav({
       label: "Reputation",
       href: wallet ? `/b/${wallet}` : "/#reputation",
     },
-    { k: "settings", label: "Settings", href: "/settings" },
+    { k: "admin", label: "Admin", href: "/admin" },
   ];
   return (
     <header className="flex items-center justify-between border-b border-rule bg-paper px-7 py-3.5">

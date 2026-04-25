@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { pickAddressLabel, shortAddress } from "@/lib/ens-client";
 import {
@@ -161,7 +162,14 @@ export function LookupPanel() {
           className="bg-ink px-6 text-paper disabled:opacity-60"
           style={{ fontSize: 13, letterSpacing: 0.3 }}
         >
-          {resolving ? "Resolving…" : "View profile →"}
+          {resolving ? (
+            "Resolving…"
+          ) : (
+            <span className="inline-flex items-center gap-2">
+              View profile
+              <ArrowRight size={14} />
+            </span>
+          )}
         </button>
       </form>
       {error && (
@@ -194,7 +202,10 @@ export function LookupPanel() {
             className="border border-l-0 border-rule bg-ink px-6 text-paper hover:bg-accent"
             style={{ fontSize: 13, letterSpacing: 0.3 }}
           >
-            View reputation →
+            <span className="inline-flex items-center gap-2">
+              View reputation
+              <ArrowRight size={14} />
+            </span>
           </button>
         </div>
       )}
@@ -219,7 +230,7 @@ export function LookupPanel() {
         )}
         {!loading && directory.length === 0 && (
           <div className="px-6 py-8 text-sm text-muted">
-            No countersigned contracts yet on this network — once a deal
+            No countersigned contracts yet on this network. Once a deal
             advances past <span className="font-mono">Active</span>, the
             wallets show up here.
           </div>
@@ -252,7 +263,7 @@ export function LookupPanel() {
               {labelIsName ? (
                 label
               ) : (
-                <span className="text-muted">—</span>
+                <span className="text-muted">-</span>
               )}
             </span>
             <span
@@ -275,10 +286,11 @@ export function LookupPanel() {
               {formatDate(w.lastSeen)}
             </span>
             <span
-              className="text-right font-mono text-accent"
+              className="inline-flex items-center justify-end gap-1 text-right font-mono text-accent"
               style={{ fontSize: 11 }}
             >
-              VIEW →
+              VIEW
+              <ArrowRight size={12} />
             </span>
           </Link>
           );

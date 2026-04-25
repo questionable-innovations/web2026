@@ -43,7 +43,7 @@ export function ReleaseProposalEmail({
         escrow.
       </p>
       <p style={{ margin: "0 0 18px", fontSize: "15px", color: "#374151" }}>
-        If the work is done, approve below — one tap, no wallet hunt. If
+        If the work is done, approve below: one tap, no wallet hunt. If
         something&apos;s wrong, you can flag a dispute and the funds stay in
         escrow until you both agree.
       </p>
@@ -59,7 +59,7 @@ export function ReleaseProposalEmail({
           fontSize: "15px",
         }}
       >
-        Approve release →
+        Approve release
       </a>
       <p
         style={{

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CornerDownRight } from "lucide-react";
 import { useAccount } from "wagmi";
 import { PageShell } from "@/components/AppShell";
 import { EmailVerify } from "@/features/signing/components/EmailVerify";
@@ -96,8 +97,9 @@ function Loaded({ wallet }: { wallet: `0x${string}` }) {
             border: "1px solid var(--color-rule)",
           }}
         >
-          ↳ Your profile is stored once per wallet. Every contract you sign
-          reuses these values — no more retyping.
+          <CornerDownRight size={11} className="inline-block mr-1 align-text-bottom" />
+          Your profile is stored once per wallet. Every contract you sign
+          reuses these values; no more retyping.
         </div>
       </aside>
     </div>
@@ -188,7 +190,7 @@ function ProfileCard({
         Your email{" "}
         {profile ? (
           <span className="text-muted/70">
-            (re-verify only if changing — currently <strong>{profile.email}</strong>)
+            (re-verify only if changing; currently <strong>{profile.email}</strong>)
           </span>
         ) : (
           "(verified)"

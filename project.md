@@ -47,13 +47,15 @@ DocuSign for web3: a PDF signing flow where signing *is* paying a deposit into a
 
 ### 3.4 Deadlock: "if they don't agree, the money sits there"
 
-- **Position (per brief):** deadlock is the *feature*, not the bug. Money stuck in the middle removes either party's incentive to stonewall — neither gets it until they agree. This mirrors how commercial retention clauses work.
+- **Position:** deadlock is the *feature*, not the bug. Money stuck in the middle removes either party's incentive to stonewall — neither gets it until they agree. This mirrors how commercial retention clauses work.
+- **Where disputes get resolved: in the traditional legal system, not on-chain.** DealSeal is not an arbitration platform and will never adjudicate. The smart contract's job is to *keep the funds safe and produce admissible evidence*, full stop. If the parties disagree, they take their lawyers, the signed PDF, the audit certificate, and the on-chain history to mediation, the Disputes Tribunal, or the District Court — same as any other commercial dispute. The contract just refuses to release until both sides sign off (or a long-horizon `rescue()` path triggers).
+- This framing keeps us out of the regulatory perimeter for arbitration/financial intermediation (§11.2) and out of the technical/social rabbit hole of building a fair on-chain jury.
 - Still a real edge case worth hardening later. Known failure modes to keep noting:
-  - One party genuinely disappears (death, business collapse, lost keys). Need a long-horizon escape hatch.
-  - Partial performance — work was 80% done, what's fair?
-  - Extortion in reverse (payee threatens reputational damage to force release).
-- **For v1:** implement the deadlock faithfully, but expose a `flagDispute()` that records the disagreement on-chain (visible in reputation). Social pressure + reputation cost is the pressure valve.
-- **Post-hackathon roadmap:** optional arbitration module (pre-agreed arbitrator address, or Kleros-style jury), milestone splits, and a very-long timeout (e.g. 2 years) for the "disappeared counterparty" case.
+  - One party genuinely disappears (death, business collapse, lost keys). Need a long-horizon escape hatch — this is what `rescue()` (§4.2) addresses, *not* dispute resolution.
+  - Partial performance — work was 80% done, what's fair? Off-chain negotiation, then court. Not our problem to model.
+  - Extortion in reverse (payee threatens reputational damage to force release). Reputation visibility is a feature; abuse via reputation is also resolvable through defamation / FTA channels.
+- **For v1:** expose a `flagDispute()` that freezes the deal and records the disagreement on-chain (visible in reputation). Surface the audit certificate + signed PDF as a downloadable "evidence pack" so users can hand them straight to counsel.
+- **Explicitly NOT on the roadmap:** crypto-native arbitration modules (Kleros-style juries, pre-agreed arbitrator addresses). Those add legal/technical complexity to solve a problem the existing legal system already solves. Milestone splits and the long-horizon `rescue()` timeout *are* on the roadmap; arbitration is not.
 
 ### 3.5 Wallet UX
 
@@ -161,15 +163,31 @@ Purely an **index + UX cache**. Nothing authoritative:
 - One-click "reset demo" button on a hidden `/demo` route that redeploys fresh escrows.
 - **The memorable moment:** split-screen, two laptops. Left = contractor. Right = client. Client clicks Sign → in one transaction the PDF goes green-checked AND the dNZD number animates from client wallet into the escrow card. Cut to contractor's reputation incrementing from 12 → 13. Rehearse 20 times.
 
+### 4.6 Yield on escrow — Aave (opt-in, USDC-only)
+
+Deposits route through **Aave V3 on Avalanche** while sitting in escrow; interest is skimmed to a platform wallet at withdraw, principal returns to the payee. Lifted from §5 stretch into v1 because it's the platform's only revenue lever and doesn't change the user-facing flow.
+
+**Configured at factory deploy** (all-or-nothing, immutable):
+- `aavePool` — Aave V3 Pool address.
+- `platformWallet` — interest sink.
+- `aaveSupportedToken` — single ERC-20 routed through Aave (USDC on Avalanche). Tokens *other* than this never touch Aave, so dNZD (not Aave-listed) keeps working unchanged. The constructor reverts on partial config — all three set, or all three zero.
+
+**Per-clone behaviour:**
+- `countersign()` — supplies the deposit only if `token == aaveSupportedToken && aavePool != 0`. Uses `SafeERC20.forceApprove` (handles USDT-style allowance quirks). For non-Aave tokens, behaviour is unchanged from pre-Aave.
+- `withdraw()` — pulls principal + interest in one Aave call. **Reverts on shortfall** (pool paused / capped / illiquid). The "state change then call" ordering means the revert unwinds state back to `Released`, and partyA can retry once Aave is healthy. Never silently sends less than the released amount.
+- `rescue()` — best-effort `try/catch` Aave drain, then sweeps `token.balanceOf(this)`. Aave being broken is a plausible *cause* of needing rescue, so rescue must not depend on a healthy pool.
+
+**Why USDC-only (not "any Aave-listed asset"):** the factory has no admin and no upgrade path for an allowlist. Pinning to one token is the simplest static config that doesn't risk a future Aave listing changing security assumptions. Adding more tokens = redeploy the factory (acceptable — only affects new clones, in line with §4.2).
+
 ---
 
 ## 5. Stretch ideas (post-hackathon, or if you have slack)
 
 - **In-flow fiat on-ramp.** Party B pays by card → Transak/Onramper mints dNZD → deposit happens in the same flow. Removes the "counterparty has no dNZD" dead end. Worth doing early-post-hackathon; too much moving-part risk for the demo itself.
 - **Commit-reveal countersign.** Eliminates the mempool front-run risk on the URL secret. Two-tx UX; only worth it if the exotic attack actually shows up.
-- **Arbitration module.** Pre-agreed arbitrator address or Kleros-style jury. Addresses the "genuine deadlock" edge case.
+- ~~**Arbitration module.**~~ Removed — disputes are resolved off-chain via the traditional legal system (§3.4). The smart contract holds funds and produces evidence; it does not adjudicate.
 - **Milestone splits.** Break the deposit into milestones, each released independently.
-- **Yield on escrow.** Route idle deposits into Aave/Benqi on Avalanche, split yield between parties at release. Adds smart-contract risk and complicates refunds.
+- ~~**Yield on escrow.**~~ Pulled in to v1 — see §4.6. USDC-only, single Aave V3 pool, all-or-nothing factory config. Interest goes to the platform, not split with parties (revenue lever for the platform, simpler accounting).
 - **Verifiable credentials for identity.** Integrate with a DID method (did:ethr, did:pkh) so reputation is portable across platforms.
 - **ZK-proof of "I have completed ≥10 contracts with zero disputes"** without revealing which contracts. Real reputation killer-feature.
 - **Template marketplace.** NZ-specific templates (IRD-compliant, CCCFA-aware, etc.) as a paid upsell.
@@ -230,7 +248,7 @@ Purely an **index + UX cache**. Nothing authoritative:
 3. ~~**Name:**~~ Decided: **DealSeal**.
 4. ~~**ENS on Avalanche:**~~ On hold — see §10.
 5. ~~**Counterparty gating:**~~ Decided: **URL-secret capability model** (§4.2).
-6. **Dispute fallback:** deadlock-by-design for v1; long-horizon escape hatch and optional arbitration module on the roadmap.
+6. ~~**Dispute fallback:**~~ Decided: deadlock-by-design; disputes resolved off-chain via traditional legal channels (§3.4). On-chain `flagDispute()` freezes funds and records the disagreement; the audit certificate + signed PDF are the artifacts you take to your lawyer. No arbitration module — ever.
 7. **Chain:** Fuji testnet for demo (design contracts to be L1-portable). Confirm.
 8. **Team size + deadline:** how many people, how many days until the hackathon? Governs what's realistic from §7.
 9. **dNZD on Avalanche status:** does New Money have a native C-chain deployment? If not, commit to USDC for the demo and keep dNZD as the roadmap story. Need to email New Money this week.
@@ -352,6 +370,10 @@ Not a substitute for actual legal advice. Get a tech-and-financial-services lawy
 | Token swap changes asset depositors own | Mutable token address | Token is `immutable` on the escrow clone, set at init. |
 | PII leak via on-chain data | Naïve commitment format | Name/email stored as **salted** hashes (per-attestation salt); plaintext only off-chain. |
 | Stale share link revived months later | Capability reuse | `validUntil` on the escrow; secret marked consumed on first successful countersign. |
+| Aave shortfall silently shrinks payout | `withdraw` path with Aave enabled (§4.6) | `withdraw` reverts on `totalWithdrawn < amt` and the state revert lets partyA retry once Aave is healthy. Never sends less than the released amount. |
+| Aave outage permanently bricks rescue | `rescue` path with Aave enabled | Aave drain is `try/catch`; rescue then sweeps `token.balanceOf` regardless. Funds left in a paused pool are recoverable later via a follow-up `withdraw`. |
+| Aave brick on non-listed asset deposit | `countersign` with Aave globally enabled | Per-clone gate: only `aaveSupportedToken` clones touch Aave. dNZD and other unlisted assets bypass the supply call entirely. |
+| Stale ERC-20 allowance to Aave Pool blocks subsequent supply | USDT-style tokens reverting on non-zero→non-zero allowance | `SafeERC20.forceApprove` zeroes first, then sets, on every supply. |
 
 ### 12.2 Foundry invariants to write
 
@@ -363,3 +385,5 @@ Not a substitute for actual legal advice. Get a tech-and-financial-services lawy
 - Symbolic check (`halmos`) on `approveRelease`: no input causes funds to flow to a non-signer address.
 - URL-secret: `countersign` reverts if preimage doesn't match stored hash; succeeds exactly once; reverts after `validUntil`.
 - `rescue()` is unreachable before `RESCUE_TIMEOUT`.
+- **Aave (§4.6):** for any clone deployed against an Aave-enabled factory + supported token: post-`withdraw`, partyA's net token balance increases by exactly `amount`, and `platformWallet`'s balance increases by exactly `aBalance - amount` at withdraw time. Across `withdraw` + `rescue` paths, no token sits stranded on the clone (`token.balanceOf(clone) == 0` after termination).
+- **Aave (§4.6):** for any clone deployed against an Aave-disabled factory or a non-supported token: clone never calls into the Aave pool (mock pool reverts on any call → all happy-path tests still pass).

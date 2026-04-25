@@ -11,8 +11,14 @@ import {Escrow} from "./Escrow.sol";
 ///      behind a 2-of-3 timelocked multisig; that affects only *future* clones.
 contract EscrowFactory {
     address public immutable implementation;
-    address public platformWallet;
-    address public aavePool;
+    /// Sink for Aave interest skim. Zero iff Aave integration is disabled.
+    address public immutable platformWallet;
+    /// Aave V3 Pool. Zero disables the integration entirely.
+    address public immutable aavePool;
+    /// Single ERC20 we'll route through Aave (e.g. USDC). Tokens other than
+    /// this never call into Aave, so non-listed assets like dNZD don't brick
+    /// `countersign` (yield-on-escrow stretch, §5).
+    address public immutable aaveSupportedToken;
 
     address[] public allEscrows;
     mapping(address => address[]) public escrowsByParty;
@@ -24,11 +30,27 @@ contract EscrowFactory {
     event EscrowCountersigned(address indexed escrow, address indexed partyB);
 
     error NotEscrow();
+    error InvalidConfig();
 
-    constructor(address _implementation, address _platformWallet, address _aavePool) {
+    constructor(
+        address _implementation,
+        address _platformWallet,
+        address _aavePool,
+        address _aaveSupportedToken
+    ) {
+        if (_implementation == address(0)) revert InvalidConfig();
+        // Aave integration is all-or-nothing: enabling the pool requires both
+        // the interest sink and a supported token; disabling it requires both
+        // unset. Misconfigurations fail at deploy, not in production.
+        bool aaveOn = _aavePool != address(0);
+        bool sinkSet = _platformWallet != address(0);
+        bool tokenSet = _aaveSupportedToken != address(0);
+        if (aaveOn != sinkSet || aaveOn != tokenSet) revert InvalidConfig();
+
         implementation = _implementation;
         platformWallet = _platformWallet;
         aavePool = _aavePool;
+        aaveSupportedToken = _aaveSupportedToken;
     }
 
     /// @notice Deploy a new Escrow clone and initialize it atomically.

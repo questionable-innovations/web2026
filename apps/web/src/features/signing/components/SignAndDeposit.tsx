@@ -261,8 +261,8 @@ function Inner({
       }
 
       onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError("An error occurred.");
       setStage("error");
     }
   }

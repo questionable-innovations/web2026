@@ -51,6 +51,12 @@ export async function POST(req: Request) {
           .describe(
             "The total due or total billing amount mentioned in the contract (numeric string only, e.g. 10000). Leave blank or omit if not found."
           ),
+        daysUntilDeadline: z
+          .number()
+          .optional()
+          .describe(
+            "The number of days until the deal deadline or expiration, if explicitly stated (e.g. 30, 21, 60). Leave blank or omit if not found."
+          ),
       }),
       prompt: `Analyze the following contract document text and extract the key details defined by the schema. If a piece of information is completely missing from the text, omit the field entirely or return an empty string. Do not invent information.\n\nDocument Text:\n${pdfText}`,
     });

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUpRight, Check } from "lucide-react";
 import { readSecretFromHash } from "@/lib/share-link";
 import { BrandMark, PdfThumb, Seal } from "@/components/AppShell";
+import { PdfViewer } from "./PdfViewer";
 import { SignAndPay } from "./SignAndDeposit";
 import { depositToken } from "@/lib/chain";
 
@@ -267,7 +268,7 @@ function BLanding({
             <span>{info.title} · preview</span>
             <span>SHA256 · {info.pdfHash.slice(0, 6)}…{info.pdfHash.slice(-4)}</span>
           </div>
-          <PdfThumb height={400} title={info.title} />
+          <PdfViewer escrowAddress={info.escrowAddress} />
         </div>
       </div>
     </div>

@@ -1,12 +1,13 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { useConnect } from "wagmi";
 import type { Connector } from "wagmi";
 import { useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
 import { useActiveWallet } from "@/lib/active-wallet";
 import { isLocalhost } from "@/lib/isLocalhost";
+import { errorMessage, toastError } from "@/lib/error-toast";
 
 /// Gate for any flow that requires a connected wallet. Renders a sign-in
 /// surface if the user isn't connected, then hands the address down to the
@@ -40,6 +41,10 @@ export function WalletGate({
     typeof window !== "undefined" &&
     (window as { ethereum?: unknown }).ethereum !== undefined;
   const showRawErrors = isLocalhost();
+
+  useEffect(() => {
+    if (error) toastError("Wallet connect failed", error);
+  }, [error]);
 
   if (isConnected && address) {
     return <>{children(address)}</>;
@@ -267,10 +272,8 @@ export function WalletGate({
     try {
       await action();
     } catch (err) {
-      console.error("Embedded wallet login failed", err);
-      setEmbeddedError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      toastError("Sign-in failed", err);
+      setEmbeddedError(errorMessage(err));
     } finally {
       setEmbeddedPendingKey(null);
     }

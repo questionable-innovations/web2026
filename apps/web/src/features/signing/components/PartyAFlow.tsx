@@ -30,6 +30,7 @@ import {
 import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { isLocalhost } from "@/lib/isLocalhost";
+import { errorMessage, toastError } from "@/lib/error-toast";
 import { PdfViewer } from "./PdfViewer";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
@@ -338,9 +339,7 @@ function DetailsStep({
       });
       await handleFile(demoFile);
     } catch (err) {
-      console.error("Demo load failed", err);
-      const message = err instanceof Error ? err.message : "Unknown error";
-      alert(`Demo load failed: ${message}`);
+      toastError("Demo load failed", err);
       setIsAnalyzing(false);
     }
   };
@@ -371,12 +370,10 @@ function DetailsStep({
         if (data.daysUntilDeadline) setDays(String(data.daysUntilDeadline));
       } else {
         const errText = await res.text();
-        alert(`API Error: ${errText}`);
+        toastError("AI extraction failed", errText || `HTTP ${res.status}`);
       }
     } catch (err: unknown) {
-      console.error("AI Extraction failed", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-      alert(`Network Error: ${errorMessage}`);
+      toastError("AI extraction failed", err);
     } finally {
       setIsAnalyzing(false);
     }
@@ -727,7 +724,9 @@ function SignStep({
           setStampedFile(newFile);
         }
       } catch (err) {
-        console.error("Preview stamp error", err);
+        // Preview-only failure - the real stamp runs again post-tx.
+        // Surface it so users aren't left wondering why the preview is stale.
+        toastError("Couldn't render signed preview", err);
       }
     }
     stampPreview();
@@ -953,13 +952,9 @@ function SignStep({
                 signedPdfCid,
               });
             } catch (err) {
-              setError(
-                showRawErrors
-                  ? err instanceof Error
-                    ? err.message
-                    : "Something went wrong"
-                  : "An error occurred.",
-              );
+              const message = errorMessage(err);
+              toastError("Sign & deploy failed", err);
+              setError(showRawErrors ? message : "An error occurred.");
               setStage("error");
             }
           }}

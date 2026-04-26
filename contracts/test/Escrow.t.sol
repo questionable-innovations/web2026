@@ -159,7 +159,7 @@ contract EscrowTest is Test {
         e = Escrow(predicted);
     }
 
-    function test_happyPath() public {
+    function test_happyPath_releaseToA() public {
         Escrow e = _createWithSig();
         bytes32 pdfHash = keccak256("pdf-bytes");
 
@@ -169,11 +169,8 @@ contract EscrowTest is Test {
         vm.startPrank(bob.addr);
         token.approve(address(e), 1_000 ether);
         e.countersign(SECRET, aB, sigB);
-        e.proposeRelease();
+        e.releaseToA();
         vm.stopPrank();
-
-        vm.prank(alice.addr);
-        e.approveRelease();
 
         e.withdraw();
 
@@ -183,6 +180,29 @@ contract EscrowTest is Test {
         // partyB is indexed too — reputation aggregates over both sides.
         assertEq(factory.partyEscrowCount(bob.addr), 1);
         assertEq(factory.partyEscrowCount(alice.addr), 1);
+    }
+
+    function test_happyPath_refundToB() public {
+        Escrow e = _createWithSig();
+        bytes32 pdfHash = keccak256("pdf-bytes");
+
+        (Escrow.Attestation memory aB, bytes memory sigB) =
+            _attest(bob, address(e), pdfHash, 0);
+
+        vm.startPrank(bob.addr);
+        token.approve(address(e), 1_000 ether);
+        e.countersign(SECRET, aB, sigB);
+        vm.stopPrank();
+
+        uint256 bobBefore = token.balanceOf(bob.addr);
+
+        vm.prank(alice.addr);
+        e.refundToB();
+
+        e.withdraw();
+
+        assertEq(uint8(e.state()), uint8(Escrow.State.Closed));
+        assertEq(token.balanceOf(bob.addr) - bobBefore, 1_000 ether);
     }
 
     function test_recordCountersign_onlyEscrow() public {
@@ -255,10 +275,8 @@ contract EscrowTest is Test {
         assertEq(uint8(e.state()), uint8(Escrow.State.Active));
 
         // Release path works again after un-disputing.
-        vm.prank(alice.addr);
-        e.proposeRelease();
         vm.prank(bob.addr);
-        e.approveRelease();
+        e.releaseToA();
         e.withdraw();
         assertEq(token.balanceOf(alice.addr), 1_000 ether);
     }
@@ -305,9 +323,13 @@ contract EscrowTest is Test {
         vm.stopPrank();
 
         assertEq(uint8(e.state()), uint8(Escrow.State.Disputed));
+        // Neither direction can settle while a dispute is on record.
+        vm.expectRevert();
+        vm.prank(bob.addr);
+        e.releaseToA();
         vm.expectRevert();
         vm.prank(alice.addr);
-        e.proposeRelease();
+        e.refundToB();
     }
 
     function test_rescueAfterTimeout() public {
@@ -338,7 +360,9 @@ contract EscrowTest is Test {
         assertEq(uint8(e.state()), uint8(Escrow.State.Rescued));
     }
 
-    function test_cancelDisputeFromReleasingRestoresReleasing() public {
+    function test_partyACannotReleaseToA() public {
+        // Only Party B (the depositor) can release the deposit to Party A —
+        // Party A would otherwise be sending funds to themselves.
         Escrow e = _createWithSig();
         bytes32 pdfHash = keccak256("pdf-bytes");
         (Escrow.Attestation memory aB, bytes memory sigB) =
@@ -349,28 +373,13 @@ contract EscrowTest is Test {
         e.countersign(SECRET, aB, sigB);
         vm.stopPrank();
 
+        vm.expectRevert(Escrow.NotPartyB.selector);
         vm.prank(alice.addr);
-        e.proposeRelease();
-        assertEq(uint8(e.state()), uint8(Escrow.State.Releasing));
-
-        // Bob disputes from Releasing, then withdraws the dispute.
-        vm.prank(bob.addr);
-        e.flagDispute("changed mind");
-        vm.prank(bob.addr);
-        e.cancelDispute();
-
-        // State must restore to Releasing (not Active) so Alice's pending
-        // proposal isn't griefed away.
-        assertEq(uint8(e.state()), uint8(Escrow.State.Releasing));
-        assertEq(e.proposedReleaseBy(), alice.addr);
-
-        // And approveRelease still works.
-        vm.prank(bob.addr);
-        e.approveRelease();
-        assertEq(uint8(e.state()), uint8(Escrow.State.Released));
+        e.releaseToA();
     }
 
-    function test_cannotApproveOwnProposal() public {
+    function test_partyBCannotRefundToB() public {
+        // Mirror image: only Party A can refund the deposit back to Party B.
         Escrow e = _createWithSig();
         bytes32 pdfHash = keccak256("pdf-bytes");
         (Escrow.Attestation memory aB, bytes memory sigB) =
@@ -379,9 +388,8 @@ contract EscrowTest is Test {
         vm.startPrank(bob.addr);
         token.approve(address(e), 1_000 ether);
         e.countersign(SECRET, aB, sigB);
-        e.proposeRelease();
-        vm.expectRevert(Escrow.CannotApproveOwnProposal.selector);
-        e.approveRelease();
+        vm.expectRevert(Escrow.NotPartyA.selector);
+        e.refundToB();
         vm.stopPrank();
     }
 
@@ -406,9 +414,7 @@ contract EscrowTest is Test {
         pool.accrue(address(e), 25 ether);
 
         vm.prank(bob.addr);
-        e.proposeRelease();
-        vm.prank(alice.addr);
-        e.approveRelease();
+        e.releaseToA();
 
         uint256 aliceBefore = token.balanceOf(alice.addr);
         e.withdraw();
@@ -448,11 +454,8 @@ contract EscrowTest is Test {
         vm.startPrank(bob.addr);
         token.approve(address(e), 1_000 ether);
         e.countersign(SECRET, aB, sigB);
-        e.proposeRelease();
+        e.releaseToA();
         vm.stopPrank();
-
-        vm.prank(alice.addr);
-        e.approveRelease();
 
         pool.setShortfall(true);
         vm.expectRevert(Escrow.AaveShortfall.selector);

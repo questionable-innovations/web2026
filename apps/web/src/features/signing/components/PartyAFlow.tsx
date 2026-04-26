@@ -1085,15 +1085,36 @@ function SignStep({
                   signature,
                 ],
               });
-              await publicClient.waitForTransactionReceipt({ hash: txHash });
+              const deployReceipt = await publicClient.waitForTransactionReceipt({
+                hash: txHash,
+              });
+              if (deployReceipt.status !== "success") {
+                throw new Error(
+                  "Escrow deploy reverted on-chain (createEscrowDeterministic)",
+                );
+              }
 
               setStage("registering");
-              const attestationStructHash = (await publicClient.readContract({
-                address: predicted,
-                abi: escrowAbi,
-                functionName: "hashAttestation",
-                args: [attestation],
-              })) as `0x${string}`;
+              // Retry to ride out RPC node propagation lag — some providers
+              // route the read to a node that hasn't yet observed the new
+              // clone's bytecode immediately after the receipt resolves.
+              let attestationStructHash!: `0x${string}`;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                  attestationStructHash = (await publicClient.readContract({
+                    address: predicted,
+                    abi: escrowAbi,
+                    functionName: "hashAttestation",
+                    args: [attestation],
+                  })) as `0x${string}`;
+                  break;
+                } catch (err) {
+                  if (attempt === 2) throw err;
+                  await new Promise((r) =>
+                    setTimeout(r, 400 * (attempt + 1)),
+                  );
+                }
+              }
 
               const res = await fetch("/api/contracts", {
                 method: "POST",

@@ -24,7 +24,6 @@ const STATE_NAMES = [
   "Draft",
   "AwaitingCounterparty",
   "Active",
-  "Releasing",
   "Released",
   "Disputed",
   "Closed",
@@ -41,7 +40,7 @@ export type OnchainEscrow = {
   token: `0x${string}`;
   amount: bigint;
   factory: `0x${string}`;
-  proposedReleaseBy: `0x${string}`;
+  releaseRecipient: `0x${string}`;
   withdrawable: bigint;
   disputedBy: `0x${string}`;
   disputeReason: string;
@@ -75,7 +74,7 @@ export async function readEscrow(
     token,
     amount,
     factory,
-    proposedReleaseBy,
+    releaseRecipient,
     withdrawable,
     disputedBy,
     disputeReason,
@@ -123,7 +122,7 @@ export async function readEscrow(
     serverPublicClient.readContract({
       address,
       abi: escrowAbi,
-      functionName: "proposedReleaseBy",
+      functionName: "releaseRecipient",
     }) as Promise<`0x${string}`>,
     serverPublicClient.readContract({
       address,
@@ -169,7 +168,7 @@ export async function readEscrow(
     token,
     amount,
     factory,
-    proposedReleaseBy,
+    releaseRecipient,
     withdrawable,
     disputedBy,
     disputeReason,

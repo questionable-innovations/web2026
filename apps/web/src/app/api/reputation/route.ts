@@ -6,7 +6,6 @@ import { reverseResolveMany } from "@/lib/ens";
 
 const ACTIVE_STATES = [
   "Active",
-  "Releasing",
   "Released",
   "Closed",
   "Disputed",
@@ -44,7 +43,7 @@ export async function GET() {
     })
     .from(contracts)
     .where(
-      sql`${contracts.partyBWallet} is not null and ${contracts.state} in ('Active','Releasing','Released','Closed','Disputed')`,
+      sql`${contracts.partyBWallet} is not null and ${contracts.state} in ('Active','Released','Closed','Disputed')`,
     )
     .groupBy(contracts.partyBWallet)
     .orderBy(sql`last_seen desc`)

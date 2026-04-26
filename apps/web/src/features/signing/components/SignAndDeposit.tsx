@@ -167,14 +167,30 @@ export function SignAndPayForm({
         functionName: "countersign",
         args: [secret, attestation, signature],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      const countersignReceipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+      if (countersignReceipt.status !== "success") {
+        throw new Error("Countersign reverted on-chain");
+      }
 
-      const attestationStructHash = (await publicClient.readContract({
-        address: info.escrowAddress,
-        abi: escrowAbi,
-        functionName: "hashAttestation",
-        args: [attestation],
-      })) as `0x${string}`;
+      // Retry to ride out RPC node propagation lag between the receipt and
+      // the immediate read on a multi-node provider.
+      let attestationStructHash!: `0x${string}`;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          attestationStructHash = (await publicClient.readContract({
+            address: info.escrowAddress,
+            abi: escrowAbi,
+            functionName: "hashAttestation",
+            args: [attestation],
+          })) as `0x${string}`;
+          break;
+        } catch (err) {
+          if (attempt === 2) throw err;
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        }
+      }
 
       // Persist Party B's countersign to the off-chain index. State moves
       // Awaiting → Active here; partyBWallet now resolves on the dashboard.

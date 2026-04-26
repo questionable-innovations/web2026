@@ -86,8 +86,8 @@ export async function GET(
           ...profileFor(partyB),
         }
       : null,
-    proposedReleaseBy:
-      onchain.proposedReleaseBy === ZERO ? null : onchain.proposedReleaseBy,
+    releaseRecipient:
+      onchain.releaseRecipient === ZERO ? null : onchain.releaseRecipient,
     withdrawable: onchain.withdrawable.toString(),
     disputedBy: onchain.disputedBy === ZERO ? null : onchain.disputedBy,
     disputeReason: onchain.disputeReason || null,

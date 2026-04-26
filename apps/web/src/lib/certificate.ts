@@ -108,12 +108,7 @@ async function collectLifecycle(
   address: `0x${string}`,
 ): Promise<AuditCertEvent[]> {
   const out: AuditCertEvent[] = [];
-  const eventNames = [
-    "ReleaseProposed",
-    "ReleaseApproved",
-    "Withdrawn",
-    "Disputed",
-  ] as const;
+  const eventNames = ["Released", "Withdrawn", "Disputed"] as const;
   for (const name of eventNames) {
     try {
       const logs = await serverPublicClient.getContractEvents({

@@ -63,11 +63,10 @@ type DisplayRow = {
   health: "not-funded" | "not-aave" | "loading" | "ok" | "shortfall";
 };
 
-const FUNDED_STATES = new Set(["Active", "Releasing", "Released", "Disputed"]);
+const FUNDED_STATES = new Set(["Active", "Released", "Disputed"]);
 const OPEN_STATES = new Set([
   "AwaitingCounterparty",
   "Active",
-  "Releasing",
   "Released",
   "Disputed",
 ]);
@@ -338,7 +337,6 @@ export function AdminContractsTable({
               <option value="open">Open</option>
               <option value="AwaitingCounterparty">Awaiting counterparty</option>
               <option value="Active">Active</option>
-              <option value="Releasing">Releasing</option>
               <option value="Released">Released</option>
               <option value="Disputed">Disputed</option>
               <option value="closed">Closed or rescued</option>

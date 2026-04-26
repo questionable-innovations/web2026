@@ -26,7 +26,6 @@ type ReleaseStatus = {
     | "Draft"
     | "AwaitingCounterparty"
     | "Active"
-    | "Releasing"
     | "Released"
     | "Disputed"
     | "Closed"
@@ -41,7 +40,7 @@ type ReleaseStatus = {
   partyB:
     | { wallet: `0x${string}`; name: string | null; email: string | null }
     | null;
-  proposedReleaseBy: `0x${string}` | null;
+  releaseRecipient: `0x${string}` | null;
   withdrawable: string;
   disputedBy: `0x${string}` | null;
   disputeReason: string | null;
@@ -52,8 +51,8 @@ const IPFS_GATEWAY =
 
 type Stage =
   | "idle"
-  | "proposing"
-  | "approving"
+  | "releasing"
+  | "refunding"
   | "withdrawing"
   | "disputing"
   | "cancelling"
@@ -63,7 +62,7 @@ export function ReleaseFlow({ escrowAddress }: { escrowAddress: string }) {
   return (
     <WalletGate
       title="Sign in to manage release"
-      blurb="Releases require both wallets to approve. Sign in with the wallet that signed this contract."
+      blurb="Sign in with the wallet that signed this contract. Each side can release the deposit to the other party — neither can pay themselves."
     >
       {(wallet) => (
         <ChainGate>
@@ -177,30 +176,26 @@ function Inner({
     }
   }
 
-  async function onPropose() {
+  async function onReleaseToA() {
     if (!publicClient) return;
-    await withTx("proposing", async () => {
+    await withTx("releasing", async () => {
       const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
-        functionName: "proposeRelease",
+        functionName: "releaseToA",
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      // Trigger the email to the counterparty.
-      await fetch(`/api/contracts/${escrowAddress}/propose-release`, {
-        method: "POST",
-      }).catch(() => {});
       return hash;
     });
   }
 
-  async function onApprove() {
+  async function onRefundToB() {
     if (!publicClient) return;
-    await withTx("approving", async () => {
+    await withTx("refunding", async () => {
       const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
-        functionName: "approveRelease",
+        functionName: "refundToB",
       });
       await publicClient.waitForTransactionReceipt({ hash });
       return hash;
@@ -281,34 +276,35 @@ function Inner({
     ? amountNumeric.toLocaleString()
     : amountDisplay;
 
-  const proposer = status.proposedReleaseBy?.toLowerCase() ?? null;
-  const proposedByA = Boolean(
-    proposer && proposer === status.partyA.wallet.toLowerCase(),
+  const recipient = status.releaseRecipient?.toLowerCase() ?? null;
+  const releasedToA = Boolean(
+    recipient && recipient === status.partyA.wallet.toLowerCase(),
   );
-  const proposedByB = Boolean(
-    proposer &&
+  const releasedToB = Boolean(
+    recipient &&
       status.partyB &&
-      proposer === status.partyB.wallet.toLowerCase(),
+      recipient === status.partyB.wallet.toLowerCase(),
   );
 
-  const settled = status.state === "Released" || status.state === "Closed";
-  const approvedA = settled || proposedByA;
-  const approvedB = settled || proposedByB;
-
-  const canProposeA = role === "A" && status.state === "Active";
-  const canProposeB = role === "B" && status.state === "Active";
-  const canApprove =
-    status.state === "Releasing" &&
-    proposer !== null &&
-    role !== "observer" &&
-    wallet.toLowerCase() !== proposer;
-  const canWithdraw = role === "A" && status.state === "Released";
-  const canDispute =
-    (status.state === "Active" || status.state === "Releasing") &&
-    role !== "observer";
+  const canReleaseToA = role === "B" && status.state === "Active";
+  const canRefundToB = role === "A" && status.state === "Active";
+  const canWithdraw =
+    status.state === "Released" &&
+    ((releasedToA && role === "A") || (releasedToB && role === "B"));
+  const canDispute = status.state === "Active" && role !== "observer";
   const canCancelDispute =
     status.state === "Disputed" &&
     status.disputedBy?.toLowerCase() === wallet.toLowerCase();
+
+  const counterparty = role === "A" ? status.partyB : status.partyA;
+  const counterpartyName =
+    counterparty && "name" in counterparty
+      ? counterparty.name ?? (role === "A" ? "Party B" : "Party A")
+      : role === "A"
+        ? "Party B"
+        : "Party A";
+  const counterpartyWallet =
+    counterparty && "wallet" in counterparty ? counterparty.wallet : null;
 
   const trimmed = `${status.escrowAddress.slice(0, 6)}…${status.escrowAddress.slice(-4)}`;
 
@@ -337,10 +333,17 @@ function Inner({
         </div>
       </div>
 
-      {status.state === "Active" && (
+      {status.state === "Active" && role !== "observer" && (
         <Banner tone="muted">
-          The deposit is sitting in escrow. Either party can propose release
-          when the work is done; the other side then approves.
+          The deposit is held in escrow. {role === "B"
+            ? `Release it to ${counterpartyName} when the work is done — they don't need to agree to receive their own payment.`
+            : `Refund the deposit to ${counterpartyName} if the deal is off — they don't need to agree to receive their own money back.`}
+        </Banner>
+      )}
+      {status.state === "Active" && role === "observer" && (
+        <Banner tone="muted">
+          The deposit is held in escrow. Each party can release the funds to
+          the other side at any time; neither can pay themselves.
         </Banner>
       )}
       {status.state === "Disputed" && (
@@ -354,8 +357,13 @@ function Inner({
       )}
       {status.state === "Released" && (
         <Banner tone="ok">
-          Both parties approved. {status.partyA.name ?? "Party A"} can now
-          withdraw the funds; anyone may trigger the pull.
+          Released to{" "}
+          {releasedToA
+            ? status.partyA.name ?? "Party A"
+            : releasedToB
+              ? status.partyB?.name ?? "Party B"
+              : "the recipient"}
+          . They can withdraw now; anyone may trigger the pull.
         </Banner>
       )}
       {status.state === "Closed" && (
@@ -371,43 +379,46 @@ function Inner({
         <div>
           <div className="border border-rule bg-card p-7">
             <div className="ds-eyebrow mb-4">
-              Approvals · {countApprovals(approvedA, approvedB)} of 2
+              {status.state === "Active"
+                ? "Release the deposit"
+                : status.state === "Released"
+                  ? "Released · awaiting withdrawal"
+                  : status.state === "Closed"
+                    ? "Closed"
+                    : "Status"}
             </div>
 
-            <div className="grid grid-cols-2 gap-3.5">
-              <PartyCard
-                label="Party A"
-                name={status.partyA.name}
-                wallet={status.partyA.wallet}
-                approved={approvedA}
-                youAre={role === "A"}
-                pending={status.state === "Releasing" && !proposedByA}
+            {status.state === "Active" && role !== "observer" && (
+              <DirectionalCard
+                youName={
+                  role === "A"
+                    ? status.partyA.name ?? "Party A"
+                    : status.partyB?.name ?? "Party B"
+                }
+                youWallet={wallet}
+                otherName={counterpartyName}
+                otherWallet={counterpartyWallet}
+                amountLabel={amountLabel}
+                tokenSymbol={tokenConfig.symbol}
+                action={role === "A" ? "refund" : "release"}
               />
-              <PartyCard
-                label="Party B"
-                name={status.partyB?.name ?? null}
-                wallet={status.partyB?.wallet ?? null}
-                approved={approvedB}
-                youAre={role === "B"}
-                pending={status.state === "Releasing" && !proposedByB}
-              />
-            </div>
+            )}
 
             <div className="mt-6 flex flex-wrap gap-2.5">
-              {canProposeA || canProposeB ? (
+              {canReleaseToA ? (
                 <ActionButton
-                  label="Propose release"
+                  label={`Release $${amountLabel} to ${counterpartyName}`}
                   primary
-                  pending={stage === "proposing"}
-                  onClick={onPropose}
+                  pending={stage === "releasing"}
+                  onClick={onReleaseToA}
                 />
               ) : null}
-              {canApprove ? (
+              {canRefundToB ? (
                 <ActionButton
-                  label="Approve release"
+                  label={`Refund $${amountLabel} to ${counterpartyName}`}
                   primary
-                  pending={stage === "approving"}
-                  onClick={onApprove}
+                  pending={stage === "refunding"}
+                  onClick={onRefundToB}
                 />
               ) : null}
               {canWithdraw ? (
@@ -520,7 +531,11 @@ function Inner({
                     color: "rgba(255,255,255,0.6)",
                   }}
                 >
-                  {status.state === "Closed" ? "Released" : "On release"}
+                  {status.state === "Closed"
+                    ? "Withdrawn"
+                    : status.state === "Released"
+                      ? "Released to"
+                      : "Held in escrow"}
                 </div>
                 <div
                   className="mt-1 font-serif"
@@ -532,17 +547,20 @@ function Inner({
                     {tokenConfig.symbol}
                   </span>
                 </div>
-                <div
-                  className="mt-1 font-mono"
-                  style={{
-                    fontSize: 11,
-                    color: "rgba(255,255,255,0.7)",
-                  }}
-                >
-                  <ArrowRight size={11} className="inline-block mr-1 align-text-bottom" />
-                  {status.partyA.wallet.slice(0, 6)}…
-                  {status.partyA.wallet.slice(-4)} (Party A)
-                </div>
+                {status.releaseRecipient && (
+                  <div
+                    className="mt-1 font-mono"
+                    style={{
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.7)",
+                    }}
+                  >
+                    <ArrowRight size={11} className="inline-block mr-1 align-text-bottom" />
+                    {status.releaseRecipient.slice(0, 6)}…
+                    {status.releaseRecipient.slice(-4)}{" "}
+                    ({releasedToA ? "Party A" : releasedToB ? "Party B" : "recipient"})
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <div
@@ -641,64 +659,6 @@ function Inner({
             <PdfViewer escrowAddress={escrowAddress} signed />
           </div>
 
-          <div className="ds-eyebrow mb-2">
-            {status.partyB?.email
-              ? `What ${status.partyB.name ?? "Party B"} sees`
-              : "Counterparty notification"}
-          </div>
-          <div className="border border-rule bg-card p-5">
-            <div
-              className="border-b border-rule-soft pb-3 font-mono text-muted"
-              style={{ fontSize: 11, lineHeight: 1.7 }}
-            >
-              <div>
-                <span className="text-ink">From</span> &nbsp;DealSeal
-                &lt;notify@dealseal.nz&gt;
-              </div>
-              <div>
-                <span className="text-ink">To</span> &nbsp;&nbsp;&nbsp;
-                {status.partyB?.email ?? "-"}
-              </div>
-              <div>
-                <span className="text-ink">Subj</span> &nbsp;Release $
-                {amountLabel} for {status.title}?
-              </div>
-            </div>
-            <div className="py-4">
-              <div
-                className="font-serif"
-                style={{ fontSize: 22, lineHeight: 1.15 }}
-              >
-                Hi {status.partyB?.name ?? "there"},
-              </div>
-              <div
-                className="mt-2.5 leading-relaxed text-ink/70"
-                style={{ fontSize: 14 }}
-              >
-                {status.partyA.name ?? "Party A"} has marked the contract
-                complete and proposed release of the ${amountLabel} you
-                placed in escrow.
-                <br />
-                <br />
-                If the work is done, approve below: one tap, no wallet
-                hunt.
-              </div>
-              <a
-                href={`/c/${escrowAddress}/release`}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 bg-accent px-4 py-3.5 font-semibold text-white"
-              >
-                Approve release
-                <ArrowRight size={14} />
-              </a>
-              <div
-                className="mt-2.5 font-mono text-muted"
-                style={{ fontSize: 11 }}
-              >
-                Email auto-sends when {status.partyA.name ?? "Party A"}{" "}
-                clicks &quot;Propose release&quot;.
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -711,11 +671,9 @@ function headline(state: ReleaseStatus["state"]): string {
     case "AwaitingCounterparty":
       return "Awaiting countersign · no release yet.";
     case "Active":
-      return "Both wallets must approve.";
-    case "Releasing":
-      return "Awaiting counterparty approval.";
+      return "Funds in escrow · release when ready.";
     case "Released":
-      return "Approved · ready to withdraw.";
+      return "Released · ready to withdraw.";
     case "Closed":
       return "Funds released.";
     case "Disputed":
@@ -732,85 +690,76 @@ function abbreviateRole(role: "A" | "B" | "observer" | null): string {
   return "-";
 }
 
-function countApprovals(a: boolean, b: boolean): number {
-  return (a ? 1 : 0) + (b ? 1 : 0);
-}
-
-function PartyCard({
-  label,
-  name,
-  wallet,
-  approved,
-  youAre,
-  pending,
+function DirectionalCard({
+  youName,
+  youWallet,
+  otherName,
+  otherWallet,
+  amountLabel,
+  tokenSymbol,
+  action,
 }: {
-  label: string;
-  name: string | null;
-  wallet: `0x${string}` | null;
-  approved: boolean;
-  youAre: boolean;
-  pending: boolean;
+  youName: string;
+  youWallet: `0x${string}`;
+  otherName: string;
+  otherWallet: `0x${string}` | null;
+  amountLabel: string;
+  tokenSymbol: string;
+  action: "release" | "refund";
 }) {
-  if (approved) {
-    return (
-      <div
-        className="p-4.5"
-        style={{
-          background: "var(--color-green-soft)",
-          border: "1px solid var(--color-green)",
-        }}
-      >
-        <div
-          className="mb-2 inline-flex items-center gap-1.5 font-mono uppercase"
-          style={{
-            fontSize: 10,
-            letterSpacing: 1,
-            color: "var(--color-green)",
-          }}
-        >
-          <Check size={11} strokeWidth={2.5} />
-          {label} approved {youAre ? "(you)" : ""}
-        </div>
-        <div
-          className="font-serif"
-          style={{ fontSize: 22, lineHeight: 1.1 }}
-        >
-          {name ?? "-"}
-        </div>
-        {wallet && (
-          <div
-            className="mt-1 font-mono text-muted"
-            style={{ fontSize: 11 }}
-          >
-            {wallet.slice(0, 6)}…{wallet.slice(-4)}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const verb = action === "release" ? "release" : "refund";
   return (
-    <div
-      className="bg-paper p-4.5"
-      style={{ border: "1px dashed var(--color-accent)" }}
-    >
+    <div className="bg-paper p-5" style={{ border: "1px solid var(--color-rule)" }}>
       <div
-        className="mb-2 font-mono uppercase text-accent"
+        className="mb-3 font-mono uppercase text-muted"
         style={{ fontSize: 10, letterSpacing: 1 }}
       >
-        {pending
-          ? `… awaiting ${label}`
-          : `${label} (no proposal yet)`}
-        {youAre ? " · you" : ""}
+        You will {verb} ${amountLabel} {tokenSymbol}
+      </div>
+      <div className="flex items-center gap-3">
+        <Endpoint role="From" name={youName} wallet={youWallet} accent />
+        <ArrowRight size={18} className="text-accent shrink-0" />
+        <Endpoint role="To" name={otherName} wallet={otherWallet} />
+      </div>
+      <p
+        className="mt-3 font-mono text-muted"
+        style={{ fontSize: 11, lineHeight: 1.6 }}
+      >
+        {otherName} doesn&apos;t need to agree to receive — you&apos;re the
+        one giving up your claim on the funds.
+      </p>
+    </div>
+  );
+}
+
+function Endpoint({
+  role,
+  name,
+  wallet,
+  accent,
+}: {
+  role: string;
+  name: string;
+  wallet: `0x${string}` | null;
+  accent?: boolean;
+}) {
+  return (
+    <div className="min-w-0 flex-1">
+      <div
+        className="font-mono uppercase text-muted"
+        style={{ fontSize: 10, letterSpacing: 1 }}
+      >
+        {role}
       </div>
       <div
-        className="font-serif"
-        style={{ fontSize: 22, lineHeight: 1.1 }}
+        className={accent ? "font-serif text-accent" : "font-serif"}
+        style={{ fontSize: 18, lineHeight: 1.15 }}
       >
-        {name ?? "-"}
+        {name}
       </div>
       {wallet && (
         <div
-          className="mt-1 font-mono text-muted"
+          className="mt-0.5 font-mono text-muted"
           style={{ fontSize: 11 }}
         >
           {wallet.slice(0, 6)}…{wallet.slice(-4)}
@@ -854,7 +803,7 @@ function DisputeBanner({
           {disputedBy?.slice(0, 6)}…{disputedBy?.slice(-4)}
         </span>
         . Neither side can release the deposit until the flagging party
-        cancels the dispute, or you both agree.
+        cancels the dispute.
       </p>
       <p
         className="mt-2 leading-relaxed text-ink/75"

@@ -6,8 +6,8 @@ import { readEscrow } from "@/lib/server-chain";
 
 /// Idempotent: re-read the escrow on-chain and mirror the state into the
 /// off-chain index. Called after any state-changing tx the client submits
-/// (approveRelease, withdraw, flagDispute, cancelDispute) so the contracts
-/// dashboard reflects the latest state without a separate indexer.
+/// (releaseToA, refundToB, withdraw, flagDispute, cancelDispute) so the
+/// contracts dashboard reflects the latest state without a separate indexer.
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ address: string }> },
@@ -32,28 +32,9 @@ export async function POST(
     );
   }
 
-  // Clear the email-idempotency marker when we're not in Releasing - a
-  // dispute → cancel → re-propose by the same party should re-trigger the
-  // email rather than be silently skipped.
-  let nextFields: string | undefined;
-  if (onchain.state !== "Releasing") {
-    try {
-      const fields = JSON.parse(row.fieldsJson) as Record<string, unknown>;
-      if (fields.releaseProposalEmailedFor) {
-        delete fields.releaseProposalEmailedFor;
-        nextFields = JSON.stringify(fields);
-      }
-    } catch {
-      // ignore corrupt JSON; leave fieldsJson alone
-    }
-  }
-
   await db
     .update(contracts)
-    .set({
-      state: onchain.state,
-      ...(nextFields ? { fieldsJson: nextFields } : {}),
-    })
+    .set({ state: onchain.state })
     .where(eq(contracts.id, row.id));
 
   return NextResponse.json({ ok: true, state: onchain.state });

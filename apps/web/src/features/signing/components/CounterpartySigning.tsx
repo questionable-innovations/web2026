@@ -15,7 +15,6 @@ import { getDepositTokenByAddress } from "@/lib/chain";
 
 const POST_SECRET_STATES = new Set([
   "Active",
-  "Releasing",
   "Released",
   "Disputed",
   "Closed",
@@ -27,6 +26,7 @@ type ContractInfo = {
   title: string;
   pdfHash: `0x${string}`;
   signedPdfCid: string | null;
+  hasSignedPdf: boolean;
   partyAName: string | null;
   partyAWallet: `0x${string}`;
   partyBWallet: `0x${string}` | null;
@@ -337,13 +337,13 @@ function BLanding({
             style={{ fontSize: 10, letterSpacing: 1 }}
           >
             <span>
-              {info.title} · {info.signedPdfCid ? "signed copy" : "preview"}
+              {info.title} · {info.hasSignedPdf ? "signed copy" : "preview"}
             </span>
             <span>SHA256 · {info.pdfHash.slice(0, 6)}…{info.pdfHash.slice(-4)}</span>
           </div>
           <PdfViewer
             escrowAddress={info.escrowAddress}
-            signed={Boolean(info.signedPdfCid)}
+            signed={info.hasSignedPdf}
           />
         </div>
       </div>
@@ -538,8 +538,8 @@ function BReceipt({ info }: { info: ContractInfo }) {
             style={{ fontSize: 16, color: "rgba(10,10,10,0.7)" }}
           >
             Not paid to {info.partyAName ?? "Party A"} yet. Funds release only
-            when both of you approve. You can verify the deposit on-chain right
-            now.
+            when you release it to {info.partyAName ?? "Party A"}, or when
+            they refund you. You can verify the deposit on-chain right now.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -604,7 +604,7 @@ function BReceipt({ info }: { info: ContractInfo }) {
                 v={`${info.totalDue} ${selectedToken.symbol}`}
               />
             )}
-            <ReceiptRow k="release" v="requires both signatures" />
+            <ReceiptRow k="release" v="you decide when to release" />
           </div>
           <a
             href={`/api/contracts/${info.escrowAddress}/pdf?signed=1`}

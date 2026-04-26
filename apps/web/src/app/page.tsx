@@ -56,7 +56,6 @@ function TopBar() {
         <a href="#how-it-works">How it works</a>
         <a href="#flow">For contractors</a>
         <a href="#reputation">Reputation</a>
-        <Link href="/graph">Graph</Link>
         <a href="#trust">Legal &amp; security</a>
       </nav>
       <div className="flex items-center gap-3">
@@ -205,9 +204,9 @@ function KnowYoureBeingPaid() {
     },
     {
       q: "Can they pull the deposit back?",
-      a: "No. Only mutual approval releases.",
-      d: "Each escrow clone has no admin key and no upgrade path. After funding, release still needs both signers to approve, and the final withdrawal pays Party A.",
-      meta: "immutable clone · mutual approval",
+      a: "No. Only the depositor releases; only the recipient refunds.",
+      d: "Each escrow clone has no admin key and no upgrade path. The depositor (Party B) releases the funds to Party A when the work's done; Party A can refund back to Party B if the deal falls through. Neither side can pay themselves.",
+      meta: "immutable clone · symmetric release",
     },
   ];
   return (
@@ -313,7 +312,7 @@ function KnowYoureBeingPaid() {
         >
           <ReceiptCell label="Escrow model" value="Per-deal contract clone" />
           <ReceiptCell label="Counterparty link" value="Secret lives in URL fragment" />
-          <ReceiptCell label="Release" value="Requires both signers" accent />
+          <ReceiptCell label="Release" value="Each side releases to the other" accent />
         </div>
       </div>
     </Section>

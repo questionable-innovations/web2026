@@ -41,14 +41,14 @@ export const escrowAbi = [
   },
   {
     type: "function",
-    name: "proposeRelease",
+    name: "releaseToA",
     stateMutability: "nonpayable",
     inputs: [],
     outputs: [],
   },
   {
     type: "function",
-    name: "approveRelease",
+    name: "refundToB",
     stateMutability: "nonpayable",
     inputs: [],
     outputs: [],
@@ -153,7 +153,7 @@ export const escrowAbi = [
   },
   {
     type: "function",
-    name: "proposedReleaseBy",
+    name: "releaseRecipient",
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "address" }],
@@ -181,14 +181,10 @@ export const escrowAbi = [
   },
   {
     type: "event",
-    name: "ReleaseProposed",
-    inputs: [{ name: "by", type: "address", indexed: true }],
-  },
-  {
-    type: "event",
-    name: "ReleaseApproved",
+    name: "Released",
     inputs: [
       { name: "by", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
     ],
   },

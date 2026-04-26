@@ -75,7 +75,7 @@ export function ReputationCard({ wallet }: { wallet: string }) {
         setLoading(false);
         // Lazily fetch the ENS profile (avatar + text records) only after the
         // reputation core has rendered, so the page paints fast even if
-        // mainnet RPC is slow. Best-effort - no spinner, no error UI.
+        // sepolia RPC is slow. Best-effort - no spinner, no error UI.
         if (d.ensName) {
           fetch(`/api/ens?name=${encodeURIComponent(d.ensName)}&profile=1`)
             .then((r) => (r.ok ? r.json() : null))

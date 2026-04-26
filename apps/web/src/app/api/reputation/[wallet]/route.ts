@@ -34,7 +34,7 @@ export async function GET(
   const decoded = decodeURIComponent(raw);
 
   // Accept either a 0x address or an ENS name. ENS names get forward-resolved
-  // against mainnet; reputation aggregation is still keyed on the address so
+  // against sepolia; reputation aggregation is still keyed on the address so
   // we don't double-count if a name moves wallets.
   let wallet: string;
   let ensFromPath: string | null = null;

@@ -8,8 +8,8 @@ import "react-pdf/dist/Page/TextLayer.css";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 type Props =
-  | { escrowAddress: string; file?: never }
-  | { file: File | Blob; escrowAddress?: never };
+  | { escrowAddress: string; signed?: boolean; file?: never }
+  | { file: File | Blob; escrowAddress?: never; signed?: never };
 
 export function PdfViewer(props: Props) {
   const [url, setUrl] = useState<string>();
@@ -27,7 +27,8 @@ export function PdfViewer(props: Props) {
       revoke = blobUrl;
       setUrl(blobUrl);
     } else if (props.escrowAddress) {
-      fetch(`/api/contracts/${props.escrowAddress}/pdf`)
+      const qs = props.signed ? "?signed=1" : "";
+      fetch(`/api/contracts/${props.escrowAddress}/pdf${qs}`)
         .then((r) => (r.ok ? r.blob() : Promise.reject(r.statusText)))
         .then((b) => {
           const blobUrl = URL.createObjectURL(b);
@@ -39,7 +40,7 @@ export function PdfViewer(props: Props) {
     return () => {
       if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [props.file, props.escrowAddress]);
+  }, [props.file, props.escrowAddress, props.signed]);
 
   if (!url) {
     return <p className="text-sm text-zinc-500">Loading PDF…</p>;

@@ -9,14 +9,12 @@ import {
   CornerDownRight,
   Flag,
 } from "lucide-react";
-import {
-  useAccount,
-  usePublicClient,
-  useWriteContract,
-} from "wagmi";
+import { usePublicClient } from "wagmi";
+import { useActiveWallet } from "@/lib/active-wallet";
 import { StateBadge } from "@/components/AppShell";
 import { WalletGate } from "@/features/signing/components/WalletGate";
 import { ChainGate } from "@/features/signing/components/ChainGate";
+import { PdfViewer } from "@/features/signing/components/PdfViewer";
 import { escrowAbi } from "@/lib/contracts/abis";
 import { depositToken } from "@/lib/chain";
 
@@ -83,8 +81,7 @@ function Inner({
   wallet: `0x${string}`;
 }) {
   const publicClient = usePublicClient();
-  const { writeContractAsync } = useWriteContract();
-  const account = useAccount();
+  const { writeContract, address: activeAddress } = useActiveWallet();
 
   const [status, setStatus] = useState<ReleaseStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -180,7 +177,7 @@ function Inner({
   async function onPropose() {
     if (!publicClient) return;
     await withTx("proposing", async () => {
-      const hash = await writeContractAsync({
+      const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
         functionName: "proposeRelease",
@@ -197,7 +194,7 @@ function Inner({
   async function onApprove() {
     if (!publicClient) return;
     await withTx("approving", async () => {
-      const hash = await writeContractAsync({
+      const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
         functionName: "approveRelease",
@@ -210,7 +207,7 @@ function Inner({
   async function onWithdraw() {
     if (!publicClient) return;
     await withTx("withdrawing", async () => {
-      const hash = await writeContractAsync({
+      const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
         functionName: "withdraw",
@@ -224,7 +221,7 @@ function Inner({
     if (!publicClient) return;
     const reason = disputeReason.trim() || "no reason given";
     await withTx("disputing", async () => {
-      const hash = await writeContractAsync({
+      const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
         functionName: "flagDispute",
@@ -240,7 +237,7 @@ function Inner({
   async function onCancelDispute() {
     if (!publicClient) return;
     await withTx("cancelling", async () => {
-      const hash = await writeContractAsync({
+      const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
         functionName: "cancelDispute",
@@ -582,8 +579,8 @@ function Inner({
             style={{ fontSize: 11, lineHeight: 1.6 }}
           >
             <CornerDownRight size={11} className="inline-block mr-1 align-text-bottom" />
-            Connected as {account.address?.slice(0, 6)}…
-            {account.address?.slice(-4)} · role {abbreviateRole(role)}.
+            Connected as {activeAddress?.slice(0, 6)}…
+            {activeAddress?.slice(-4)} · role {abbreviateRole(role)}.
           </div>
         </div>
 
@@ -609,6 +606,20 @@ function Inner({
                 hint="pinned on release · CCLA s.229"
               />
             )}
+          </div>
+
+          <div className="mb-5 border border-rule bg-card p-4.5">
+            <div
+              className="mb-3 flex justify-between font-mono uppercase text-muted"
+              style={{ fontSize: 10, letterSpacing: 1 }}
+            >
+              <span>{status.title}</span>
+              <span>
+                SHA256 · {status.pdfHash.slice(0, 6)}…
+                {status.pdfHash.slice(-4)}
+              </span>
+            </div>
+            <PdfViewer escrowAddress={escrowAddress} signed />
           </div>
 
           <div className="ds-eyebrow mb-2">

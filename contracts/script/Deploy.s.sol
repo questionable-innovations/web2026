@@ -12,12 +12,18 @@ contract Deploy is Script {
         vm.startBroadcast(pk);
         Escrow impl = new Escrow();
 
-        // Use 0x0 for platformWallet and aavePool initially, or placeholders if not set
-        // Aave V3 on Avalanche C-Chain: 0x794a61358D6845594F94dc1DB02A252b5b4814aD
+        // Leave Aave fully disabled unless all three values are supplied.
+        // This keeps dNZD escrows on the plain non-yield path.
         address platformWallet = vm.envOr("PLATFORM_WALLET", address(0));
-        address aavePool = vm.envOr("AAVE_POOL", address(0x794a61358D6845594F94dc1DB02A252b5b4814aD));
+        address aavePool = vm.envOr("AAVE_POOL", address(0));
+        address aaveSupportedToken = vm.envOr("AAVE_SUPPORTED_TOKEN", address(0));
 
-        EscrowFactory factory = new EscrowFactory(address(impl), platformWallet, aavePool);
+        EscrowFactory factory = new EscrowFactory(
+            address(impl),
+            platformWallet,
+            aavePool,
+            aaveSupportedToken
+        );
         ReputationView view_ = new ReputationView(factory);
         vm.stopBroadcast();
 

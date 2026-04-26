@@ -9,13 +9,9 @@ import {
   Check,
   CornerDownRight,
 } from "lucide-react";
-import {
-  useAccount,
-  usePublicClient,
-  useSignTypedData,
-  useWriteContract,
-} from "wagmi";
+import { usePublicClient } from "wagmi";
 import { parseUnits } from "viem";
+import { useActiveWallet } from "@/lib/active-wallet";
 import { sha256 } from "@/lib/ipfs";
 import { newSecret, secretHash, shareLink } from "@/lib/share-link";
 import {
@@ -33,6 +29,7 @@ import {
 } from "@/lib/chain";
 import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
+import { isLocalhost } from "@/lib/isLocalhost";
 import { PdfViewer } from "./PdfViewer";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
@@ -665,10 +662,10 @@ function SignStep({
   setError: (e: string | null) => void;
   onDone: (r: Result) => void;
 }) {
+  const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
   const publicClient = usePublicClient();
-  const { signTypedDataAsync } = useSignTypedData();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContract, signTypedData } = useActiveWallet();
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [stampedFile, setStampedFile] = useState<File | null>(null);
 
@@ -801,7 +798,7 @@ function SignStep({
                 emailSalt,
                 pdfHash,
               });
-              const signature = await signTypedDataAsync({
+              const signature = await signTypedData({
                 domain: eip712Domain(chainId, predicted),
                 types: eip712Types,
                 primaryType: "Attestation",
@@ -825,7 +822,7 @@ function SignStep({
               })) as number;
               const amountWei = parseUnits(details.amount, decimals);
 
-              const txHash = await writeContractAsync({
+              const txHash = await writeContract({
                 address: escrowFactoryAddress,
                 abi: escrowFactoryAbi,
                 functionName: "createEscrowDeterministic",
@@ -923,8 +920,14 @@ function SignStep({
                 secret,
                 link: shareLink(predicted, secret),
               });
-            } catch {
-              setError("An error occurred.");
+            } catch (err) {
+              setError(
+                showRawErrors
+                  ? err instanceof Error
+                    ? err.message
+                    : "Something went wrong"
+                  : "An error occurred.",
+              );
               setStage("error");
             }
           }}
@@ -958,7 +961,7 @@ function SignStep({
 /// Used inside the dashboard summary; pulls wallet from context so we can
 /// render outside of an explicit prop.
 export function useConnectedAccount() {
-  const { address } = useAccount();
+  const { address } = useActiveWallet();
   return address;
 }
 

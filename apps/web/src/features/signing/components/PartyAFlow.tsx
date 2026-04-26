@@ -67,6 +67,7 @@ type Result = {
   escrowAddress: `0x${string}`;
   secret: `0x${string}`;
   link: string;
+  signedPdfCid: string | null;
 };
 
 const STEPS: [string, Stage[]][] = [
@@ -874,6 +875,7 @@ function SignStep({
               });
               if (!res.ok) throw new Error("Failed to save contract index");
 
+              let signedPdfCid: string | null = null;
               if (signatureDataUrl) {
                 const stamped = await appendSignatureCertificate(buf, [
                   {
@@ -912,6 +914,7 @@ function SignStep({
                     headers: { "content-type": "application/json" },
                     body: JSON.stringify({ signedPdfCid: signedCid }),
                   });
+                  signedPdfCid = signedCid;
                 }
               }
 
@@ -919,6 +922,7 @@ function SignStep({
                 escrowAddress: predicted,
                 secret,
                 link: shareLink(predicted, secret),
+                signedPdfCid,
               });
             } catch (err) {
               setError(
@@ -1024,7 +1028,10 @@ function ShareStep({
           </span>
         </div>
         <div className="px-8 py-6">
-          <PdfThumb height={300} title={details.title} />
+          <PdfViewer
+            escrowAddress={result.escrowAddress}
+            signed={Boolean(result.signedPdfCid)}
+          />
           <div
             className="mt-3.5 flex items-center gap-3.5 bg-paper px-4 py-3.5"
             style={{ border: "1px solid var(--color-accent)" }}

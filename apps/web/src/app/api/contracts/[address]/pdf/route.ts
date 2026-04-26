@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { fetchPdfFromCid, IpfsFetchError } from "@/lib/ipfs-gateway";
+import { readEscrow } from "@/lib/server-chain";
 import { contracts } from "@/server/db/schema";
 import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -20,8 +21,14 @@ export async function GET(
   if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const wantSigned = new URL(req.url).searchParams.get("signed") === "1";
-  const cid =
-    wantSigned && row.signedPdfCid ? row.signedPdfCid : row.pdfCid;
+  const onchain = /^0x[0-9a-fA-F]{40}$/.test(address)
+    ? await readEscrow(address as `0x${string}`).catch(() => null)
+    : null;
+  const chainPdfCid = onchain?.pdfCid;
+  const cid = wantSigned && row.signedPdfCid
+    ? row.signedPdfCid
+    : chainPdfCid || row.pdfCid;
+
   let pdf: Uint8Array;
   try {
     pdf = await fetchPdfFromCid(cid);

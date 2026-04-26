@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Address, formatUnits, parseUnits } from "viem";
 import { useReadContracts } from "wagmi";
 import {
   AlertCircle,
-  ArrowRight,
   Banknote,
   CheckCircle2,
   CircleDollarSign,
@@ -389,12 +387,10 @@ export function AdminContractsTable({
                 <th className="px-4 py-3 text-[10px] font-normal">Interest</th>
                 <th className="px-4 py-3 text-[10px] font-normal">State</th>
                 <th className="px-4 py-3 text-[10px] font-normal">Created</th>
-                <th className="px-4 py-3 text-[10px] font-normal" />
               </tr>
             </thead>
             <tbody className="divide-y divide-rule-soft">
               {visibleRows.map((row) => {
-                const href = `/c/${row.contract.escrowAddress ?? row.contract.id}`;
                 return (
                   <tr key={row.contract.id} className="hover:bg-paper">
                     <td className="px-4 py-4">
@@ -443,21 +439,12 @@ export function AdminContractsTable({
                     <td className="px-4 py-4 font-mono text-[11px] text-muted">
                       {formatDate(row.contract.createdAt)}
                     </td>
-                    <td className="px-4 py-4 text-right">
-                      <Link
-                        href={href}
-                        className="inline-flex items-center gap-1 font-mono text-[11px] uppercase text-accent"
-                      >
-                        View
-                        <ArrowRight size={12} />
-                      </Link>
-                    </td>
                   </tr>
                 );
               })}
               {visibleRows.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted">
                     No contracts match the current filters.
                   </td>
                 </tr>

@@ -39,5 +39,6 @@ contracts/lib/
 apps/web/src/lib/contracts/generated.ts
 
 .claude/
+.tools/
 
 apps/web/data/

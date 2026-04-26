@@ -30,12 +30,32 @@ const Body = z.object({
   }),
 });
 
+// Explicit projection — never pull `pdfBlob` / `signedPdfBlob` into the
+// list response. Those columns can be megabytes per row and only the
+// dedicated /pdf endpoint needs them.
+const contractListColumns = {
+  id: contracts.id,
+  escrowAddress: contracts.escrowAddress,
+  title: contracts.title,
+  pdfCid: contracts.pdfCid,
+  pdfHash: contracts.pdfHash,
+  signedPdfCid: contracts.signedPdfCid,
+  partyAWallet: contracts.partyAWallet,
+  partyBWallet: contracts.partyBWallet,
+  depositToken: contracts.depositToken,
+  depositAmount: contracts.depositAmount,
+  totalDue: contracts.totalDue,
+  fieldsJson: contracts.fieldsJson,
+  state: contracts.state,
+  createdAt: contracts.createdAt,
+};
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const wallet = url.searchParams.get("wallet")?.toLowerCase();
   const rows = wallet
     ? await db
-        .select()
+        .select(contractListColumns)
         .from(contracts)
         .where(
           or(
@@ -46,7 +66,7 @@ export async function GET(req: Request) {
         .orderBy(desc(contracts.createdAt))
         .limit(100)
     : await db
-        .select()
+        .select(contractListColumns)
         .from(contracts)
         .orderBy(desc(contracts.createdAt))
         .limit(100);
@@ -70,9 +90,22 @@ export async function POST(req: Request) {
   // Verify on-chain state matches the claim before persisting. Without this,
   // anyone could POST arbitrary metadata against any escrow address and
   // pollute the dashboard / "verified" badges.
-  const onchain = await readEscrow(d.escrowAddress as `0x${string}`).catch(
-    () => null,
-  );
+  let onchain;
+  try {
+    onchain = await readEscrow(d.escrowAddress as `0x${string}`);
+  } catch (err) {
+    // A throw here means the contract code exists but a downstream read
+    // (state/partyA/...) failed — RPC error, decode error, unknown state.
+    // Surface it instead of pretending the escrow isn't deployed.
+    console.error("readEscrow failed", { address: d.escrowAddress, err });
+    return NextResponse.json(
+      {
+        error: "on-chain read failed",
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      { status: 502 },
+    );
+  }
   if (!onchain) {
     return NextResponse.json(
       { error: "escrow not deployed" },

@@ -103,7 +103,7 @@ export function EnsProfileCard({
   );
 }
 
-function Avatar({
+export function Avatar({
   src,
   name,
   size,

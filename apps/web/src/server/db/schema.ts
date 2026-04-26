@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { blob, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const contracts = sqliteTable("contracts", {
   id: text("id").primaryKey(),
@@ -7,7 +7,9 @@ export const contracts = sqliteTable("contracts", {
   title: text("title").notNull(),
   pdfCid: text("pdf_cid").notNull(),
   pdfHash: text("pdf_hash").notNull(),
+  pdfBlob: blob("pdf_blob", { mode: "buffer" }),
   signedPdfCid: text("signed_pdf_cid"),
+  signedPdfBlob: blob("signed_pdf_blob", { mode: "buffer" }),
   partyAWallet: text("party_a_wallet").notNull(),
   partyBWallet: text("party_b_wallet"),
   depositToken: text("deposit_token").notNull(),

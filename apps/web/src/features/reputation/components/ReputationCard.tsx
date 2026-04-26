@@ -10,6 +10,7 @@ import {
 } from "@/features/reputation/lib/tiers";
 import { pickAddressLabel, shortAddress } from "@/lib/ens-client";
 import {
+  Avatar,
   EnsProfileCard,
   type EnsProfile,
 } from "@/features/reputation/components/EnsProfileCard";
@@ -152,38 +153,61 @@ export function ReputationCard({ wallet }: { wallet: string }) {
         </Link>
       </div>
 
-      <div className="mb-8">
-        <div
-          className="font-mono uppercase text-accent"
-          style={{ fontSize: 11, letterSpacing: 2 }}
-        >
-          Tier · {tierName}
-          {ensName && (
-            <>
-              {" · "}
-              <span className="text-ink">{ensName}</span>
-            </>
-          )}
-        </div>
-        <h1
-          className="my-3 font-serif font-normal"
-          style={{ fontSize: 72, lineHeight: 1.02, letterSpacing: -2 }}
-        >
-          {headline}
-        </h1>
-        <a
-          href={`https://testnet.snowtrace.io/address/${data.wallet}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 font-mono text-muted hover:text-ink"
-          style={{ fontSize: 12, letterSpacing: 0.4 }}
-        >
-          {wallet}
-          <ArrowUpRight size={12} />
-        </a>
-        <div className="mt-2 text-base text-muted">
-          First seen {firstSeenLabel} · Banded value tier{" "}
-          {TIER_LABEL[stats.valueTier]}
+      <div className="mb-8 flex items-start gap-7">
+        {ensName && (
+          <Avatar
+            src={ensProfile?.avatar ?? null}
+            name={ensName}
+            size={120}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <div
+            className="font-mono uppercase text-accent"
+            style={{ fontSize: 11, letterSpacing: 2 }}
+          >
+            Tier · {tierName}
+            {ensName && (
+              <>
+                {" · "}
+                <span className="text-ink">{ensName}</span>
+              </>
+            )}
+          </div>
+          <h1
+            className="my-3 font-serif font-normal"
+            style={{ fontSize: 72, lineHeight: 1.02, letterSpacing: -2 }}
+          >
+            {headline}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+            <a
+              href={`https://testnet.snowtrace.io/address/${data.wallet}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 font-mono text-muted hover:text-ink"
+              style={{ fontSize: 12, letterSpacing: 0.4 }}
+            >
+              {wallet}
+              <ArrowUpRight size={12} />
+            </a>
+            {ensName && (
+              <a
+                href={`https://sepolia.app.ens.domains/${encodeURIComponent(ensName)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 border border-rule px-2.5 py-1 font-mono uppercase text-ink hover:bg-ink hover:text-paper"
+                style={{ fontSize: 10, letterSpacing: 1.5 }}
+              >
+                ENS · sepolia
+                <ArrowUpRight size={11} />
+              </a>
+            )}
+          </div>
+          <div className="mt-2 text-base text-muted">
+            First seen {firstSeenLabel} · Banded value tier{" "}
+            {TIER_LABEL[stats.valueTier]}
+          </div>
         </div>
       </div>
 

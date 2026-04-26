@@ -10,9 +10,14 @@ const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL;
 /// Server-side viem client. Used by API routes to verify that on-chain state
 /// matches what a client claims before persisting to the off-chain index -
 /// without this, anyone with an escrow address could POST forged metadata.
+///
+/// `batch.multicall` collapses readEscrow's 12 parallel eth_calls into one
+/// multicall3 request - the public Fuji RPC was timing out individual calls
+/// when fired in a burst. `retryCount` covers the rest of the flakiness.
 export const serverPublicClient = createPublicClient({
   chain,
-  transport: http(rpcUrl),
+  transport: http(rpcUrl, { retryCount: 3, timeout: 15_000 }),
+  batch: { multicall: true },
 });
 
 const STATE_NAMES = [
@@ -47,10 +52,18 @@ const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 /// Read everything we need to validate an off-chain write. Returns null when
 /// the address has no contract code (the clone hasn't been deployed) so
 /// callers can distinguish "doesn't exist" from "exists but wrong state".
+///
+/// `getCode` is retried briefly because POST /api/contracts is called
+/// immediately after the client confirms the deploy receipt — the
+/// load-balanced RPC the server hits may be one block behind.
 export async function readEscrow(
   address: `0x${string}`,
 ): Promise<OnchainEscrow | null> {
-  const code = await serverPublicClient.getCode({ address });
+  let code = await serverPublicClient.getCode({ address });
+  for (let attempt = 0; attempt < 3 && (!code || code === "0x"); attempt++) {
+    await new Promise((r) => setTimeout(r, 500));
+    code = await serverPublicClient.getCode({ address });
+  }
   if (!code || code === "0x") return null;
 
   const [

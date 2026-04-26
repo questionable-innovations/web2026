@@ -17,9 +17,7 @@ import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { isLocalhost } from "@/lib/isLocalhost";
 import { sanitizeDecimalInput } from "@/lib/input";
 import { SignaturePad } from "./SignaturePad";
-import { WalletGate } from "./WalletGate";
-import { ChainGate } from "./ChainGate";
-import { ProfileGate, type Profile } from "./ProfileGate";
+import { type Profile } from "./ProfileGate";
 import { FundWalletPanel } from "./FundWalletPanel";
 
 type ContractInfo = {
@@ -38,37 +36,12 @@ type ContractInfo = {
 
 type Stage = "idle" | "approving" | "signing" | "submitting" | "error";
 
-export function SignAndPay({
-  info,
-  secret,
-  onDone,
-}: {
-  info: ContractInfo;
-  secret: `0x${string}`;
-  onDone: () => void;
-}) {
-  return (
-    <WalletGate>
-      {(address) => (
-        <ProfileGate wallet={address}>
-          {(profile) => (
-            <ChainGate>
-              <Inner
-                info={info}
-                secret={secret}
-                wallet={address}
-                profile={profile}
-                onDone={onDone}
-              />
-            </ChainGate>
-          )}
-        </ProfileGate>
-      )}
-    </WalletGate>
-  );
-}
-
-function Inner({
+/// The actual sign+deposit form. Assumes wallet/profile/chain gates have
+/// already passed - callers must wrap this in WalletGate + ProfileGate +
+/// ChainGate (or otherwise satisfy those preconditions) before rendering.
+/// Designed to be rendered against a dark (bg-ink) surface; uses the
+/// ink-card / ink-rule palette throughout.
+export function SignAndPayForm({
   info,
   secret,
   wallet,

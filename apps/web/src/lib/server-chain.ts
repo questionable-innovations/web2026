@@ -47,10 +47,18 @@ const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 /// Read everything we need to validate an off-chain write. Returns null when
 /// the address has no contract code (the clone hasn't been deployed) so
 /// callers can distinguish "doesn't exist" from "exists but wrong state".
+///
+/// `getCode` is retried briefly because POST /api/contracts is called
+/// immediately after the client confirms the deploy receipt — the
+/// load-balanced RPC the server hits may be one block behind.
 export async function readEscrow(
   address: `0x${string}`,
 ): Promise<OnchainEscrow | null> {
-  const code = await serverPublicClient.getCode({ address });
+  let code = await serverPublicClient.getCode({ address });
+  for (let attempt = 0; attempt < 3 && (!code || code === "0x"); attempt++) {
+    await new Promise((r) => setTimeout(r, 500));
+    code = await serverPublicClient.getCode({ address });
+  }
   if (!code || code === "0x") return null;
 
   const [

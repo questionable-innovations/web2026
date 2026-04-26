@@ -1048,7 +1048,12 @@ function SignStep({
                   },
                 }),
               });
-              if (!res.ok) throw new Error("Failed to save contract index");
+              if (!res.ok) {
+                const body = await res.text().catch(() => "");
+                throw new Error(
+                  `Failed to save contract index (${res.status}): ${body || res.statusText}`,
+                );
+              }
 
               // Persist the original bytes server-side so reads don't depend
               // on flaky public IPFS gateways. IPFS pin still happens above

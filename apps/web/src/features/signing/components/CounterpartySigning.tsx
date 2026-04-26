@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowRight, ArrowUpRight, Check } from "lucide-react";
 import { useAccount } from "wagmi";
 import { readSecretFromHash } from "@/lib/share-link";
 import { BrandMark, Seal } from "@/components/AppShell";
 import { PdfViewer } from "./PdfViewer";
-import { SignAndPay } from "./SignAndDeposit";
+import { SignAndPayForm } from "./SignAndDeposit";
+import { WalletGate } from "./WalletGate";
+import { ProfileGate } from "./ProfileGate";
+import { ChainGate } from "./ChainGate";
 import { getDepositTokenByAddress } from "@/lib/chain";
 
 const POST_SECRET_STATES = new Set([
@@ -339,8 +342,51 @@ function BSignPay({
   secret: `0x${string}`;
   onDone: () => void;
 }) {
+  // The wallet sign-in / profile / chain gates render light-mode UIs (bg-card
+  // on bg-paper). Only flip to the dark sign+deposit canvas once all three
+  // gates have passed - otherwise the gate cards sit on a black page and look
+  // broken.
   return (
-    <div className="min-h-screen bg-ink text-paper">
+    <Frame>
+      <WalletGate
+        title="Sign in to seal this deal"
+        blurb="Connect a wallet to sign the contract and place the deposit. Your wallet pays the deposit; your signature binds you to the agreement."
+      >
+        {(address) => (
+          <ProfileGate wallet={address}>
+            {(profile) => (
+              <ChainGate>
+                <BSignPayDark info={info}>
+                  <SignAndPayForm
+                    info={info}
+                    secret={secret}
+                    wallet={address}
+                    profile={profile}
+                    onDone={onDone}
+                  />
+                </BSignPayDark>
+              </ChainGate>
+            )}
+          </ProfileGate>
+        )}
+      </WalletGate>
+    </Frame>
+  );
+}
+
+/// Dark-canvas layout for the actual sign+deposit step. Rendered as a fixed
+/// overlay so it covers the light Frame the gates were sitting in - the
+/// gates' render-prop nesting otherwise leaves us nested inside that light
+/// container.
+function BSignPayDark({
+  info,
+  children,
+}: {
+  info: ContractInfo;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-10 overflow-y-auto bg-ink text-paper">
       <div className="flex items-center justify-between border-b border-ink-rule-soft px-8 py-5">
         <span
           className="font-serif text-paper"
@@ -400,7 +446,7 @@ function BSignPay({
             </p>
           </div>
 
-          <SignAndPay info={info} secret={secret} onDone={onDone} />
+          {children}
         </div>
       </div>
     </div>

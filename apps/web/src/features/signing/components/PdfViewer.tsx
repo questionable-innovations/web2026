@@ -13,6 +13,7 @@ type Props =
 
 export function PdfViewer(props: Props) {
   const [url, setUrl] = useState<string>();
+  const [error, setError] = useState<string | null>(null);
   const [pages, setPages] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef(0);
@@ -21,6 +22,9 @@ export function PdfViewer(props: Props) {
   useEffect(() => {
     let revoke: string | undefined;
     isRestoringRef.current = true; // Suspend saving scroll position while fetching/reloading
+    setError(null);
+    setUrl(undefined);
+    setPages(0);
     
     if (props.file) {
       const blobUrl = URL.createObjectURL(props.file);
@@ -29,18 +33,35 @@ export function PdfViewer(props: Props) {
     } else if (props.escrowAddress) {
       const qs = props.signed ? "?signed=1" : "";
       fetch(`/api/contracts/${props.escrowAddress}/pdf${qs}`)
-        .then((r) => (r.ok ? r.blob() : Promise.reject(r.statusText)))
+        .then(async (r) => {
+          if (r.ok) return r.blob();
+          let message = "PDF could not be fetched.";
+          try {
+            const payload = (await r.json()) as { error?: unknown };
+            if (typeof payload.error === "string") message = payload.error;
+          } catch {
+            if (r.statusText) message = r.statusText;
+          }
+          throw new Error(message);
+        })
         .then((b) => {
           const blobUrl = URL.createObjectURL(b);
           revoke = blobUrl;
           setUrl(blobUrl);
         })
-        .catch(() => setUrl(undefined));
+        .catch((err: Error) => {
+          setUrl(undefined);
+          setError(err.message);
+        });
     }
     return () => {
       if (revoke) URL.revokeObjectURL(revoke);
     };
   }, [props.file, props.escrowAddress, props.signed]);
+
+  if (error) {
+    return <p className="text-sm text-accent">Couldn&apos;t load PDF: {error}</p>;
+  }
 
   if (!url) {
     return <p className="text-sm text-zinc-500">Loading PDF…</p>;
@@ -58,6 +79,9 @@ export function PdfViewer(props: Props) {
       <Document
         file={url}
         loading={null} // Prevent layout collapse to minimize scroll-jump
+        onLoadError={(err) => {
+          setError(err.message || "PDF renderer could not read this file.");
+        }}
         onLoadSuccess={({ numPages }) => {
           setPages(numPages);
           

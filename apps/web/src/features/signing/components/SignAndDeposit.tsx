@@ -511,10 +511,10 @@ async function postCountersignWithRetry(
   const url = `/api/contracts/${escrowAddress}/countersign`;
   const body = JSON.stringify({ partyB });
   const MAX_ATTEMPTS = 4;
-  let lastError = "Failed to save countersign";
-  let lastStatus: number | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const isLast = attempt === MAX_ATTEMPTS - 1;
+    let outcome: { kind: "retry" | "fail"; error: Error };
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -523,59 +523,45 @@ async function postCountersignWithRetry(
       });
       if (res.ok) return;
 
-      lastStatus = res.status;
-      let message = lastError;
+      let message = "Failed to save countersign";
       try {
         const payload = (await res.clone().json()) as { error?: unknown };
         if (typeof payload?.error === "string") message = payload.error;
       } catch {
         // Keep the generic fallback if the response isn't JSON.
       }
-      lastError = message;
-
       // 5xx or a 409 on a stale-state read is transient. Other 4xx is a
       // semantic mismatch (wrong wallet, factory mismatch, schema fail) -
       // no point hammering the server.
-      const transientStatus =
+      const transient =
         res.status >= 500 ||
-        (res.status === 409 && /not yet countersigned|escrow not deployed/i.test(message));
-      if (!transientStatus || attempt === MAX_ATTEMPTS - 1) {
-        console.error("Countersign index save failed", {
+        (res.status === 409 &&
+          /not yet countersigned|escrow not deployed/i.test(message));
+      outcome = { kind: transient ? "retry" : "fail", error: new Error(message) };
+      console[transient && !isLast ? "warn" : "error"](
+        "Countersign index save failed",
+        {
           escrowAddress,
           status: res.status,
           statusText: res.statusText,
           message,
           attempt: attempt + 1,
-        });
-        throw new Error(message);
-      }
-      console.warn("Countersign index save retrying", {
-        escrowAddress,
-        status: res.status,
-        message,
-        attempt: attempt + 1,
-      });
+        },
+      );
     } catch (err) {
-      // Network error (fetch threw) - treat as transient until we exhaust.
-      if (err instanceof Error && err.message === lastError) throw err;
-      if (attempt === MAX_ATTEMPTS - 1) {
-        console.error("Countersign index save network error", {
-          escrowAddress,
-          attempt: attempt + 1,
-          err,
-        });
-        throw err;
-      }
-      console.warn("Countersign index save network error, retrying", {
+      // fetch itself threw - network error, always transient.
+      outcome = {
+        kind: "retry",
+        error: err instanceof Error ? err : new Error(String(err)),
+      };
+      console[isLast ? "error" : "warn"]("Countersign index save network error", {
         escrowAddress,
         attempt: attempt + 1,
         err,
       });
     }
+
+    if (outcome.kind === "fail" || isLast) throw outcome.error;
     await new Promise((r) => setTimeout(r, 600 * 2 ** attempt));
   }
-
-  // Defensive: the loop's final-attempt branches all throw, but TS can't
-  // narrow that without an exhaustiveness marker.
-  throw new Error(`${lastError}${lastStatus ? ` (HTTP ${lastStatus})` : ""}`);
 }

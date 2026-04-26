@@ -655,7 +655,7 @@ function Footer() {
       }}
     >
       <span>DEALSEAL.NZ · © 2026</span>
-      <span>{`NON-CUSTODIAL · ${activeChain.name.toUpperCase()} · ${depositToken.symbol.toUpperCase()} DEPOSIT FLOW`}</span>
+      <span>{`NON-CUSTODIAL · ${activeChain.name.toUpperCase()} · ${depositToken.symbol} DEPOSIT FLOW`}</span>
       <span>
         <a
           href="https://github.com/questionable-innovations/web2026"

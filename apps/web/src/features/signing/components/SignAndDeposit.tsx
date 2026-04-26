@@ -202,18 +202,33 @@ function Inner({
 
       // Persist Party B's countersign to the off-chain index. State moves
       // Awaiting → Active here; partyBWallet now resolves on the dashboard.
-      await fetch(`/api/contracts/${info.escrowAddress}/countersign`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          partyB: {
-            wallet,
-            name: profile.name,
-            email: profile.email,
-            attestationHash: attestationStructHash,
-          },
-        }),
-      });
+      const countersignRes = await fetch(
+        `/api/contracts/${info.escrowAddress}/countersign`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            partyB: {
+              wallet,
+              name: profile.name,
+              email: profile.email,
+              attestationHash: attestationStructHash,
+            },
+          }),
+        },
+      );
+      if (!countersignRes.ok) {
+        let message = "Failed to save countersign";
+        try {
+          const payload = (await countersignRes.json()) as { error?: unknown };
+          if (typeof payload?.error === "string") {
+            message = payload.error;
+          }
+        } catch {
+          // Keep the generic fallback if the response isn't JSON.
+        }
+        throw new Error(message);
+      }
 
       // Stamp B's Quick Sign block onto the existing signed PDF (which
       // carries A's block) and re-pin. On-chain pdfHash is unchanged -

@@ -1,11 +1,10 @@
 export function StateMachine({ compact = false }: { compact?: boolean }) {
   const states = [
     { id: "draft", label: "Draft", x: 80, desc: ["Internal default"] },
-    { id: "await", label: "Awaiting", x: 250, desc: ["Party A signed", "Link sent"] },
-    { id: "active", label: "Active", x: 420, desc: ["Party B signed", "Deposit held"] },
-    { id: "release", label: "Releasing", x: 590, desc: ["One signer proposed", "release"] },
-    { id: "released", label: "Released", x: 760, desc: ["Both signers", "approved"] },
-    { id: "closed", label: "Closed", x: 930, desc: ["Funds withdrawn", "to Party A"] },
+    { id: "await", label: "Awaiting", x: 280, desc: ["Party A signed", "Link sent"] },
+    { id: "active", label: "Active", x: 500, desc: ["Party B signed", "Deposit held"] },
+    { id: "released", label: "Released", x: 720, desc: ["Either side gave", "up their claim"] },
+    { id: "closed", label: "Closed", x: 930, desc: ["Funds withdrawn", "to recipient"] },
   ];
   const W = 1060;
   const H = compact ? 220 : 332;
@@ -186,11 +185,10 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
 
       {!compact &&
         [
-          { x: 165, label: "initialize()" },
-          { x: 335, label: "countersign() + deposit" },
-          { x: 505, label: "proposeRelease()" },
-          { x: 675, label: "approveRelease()" },
-          { x: 845, label: "withdraw()" },
+          { x: 180, label: "initialize()" },
+          { x: 390, label: "countersign() + deposit" },
+          { x: 610, label: "releaseToA() / refundToB()" },
+          { x: 825, label: "withdraw()" },
         ].map((l, i) => (
           <text
             key={i}

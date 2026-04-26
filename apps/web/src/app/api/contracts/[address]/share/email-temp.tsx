@@ -45,8 +45,8 @@ export function ShareLinkEmail({
       </p>
       <p style={{ margin: "0 0 18px", fontSize: "15px", color: "#374151" }}>
         Open the link below to review the document, sign, and place the
-        deposit in one transaction. Funds release only when both wallets
-        approve.
+        deposit in one transaction. After signing, you decide when to release
+        the deposit; {sender} can refund it back to you at any time.
       </p>
       <a
         href={url}

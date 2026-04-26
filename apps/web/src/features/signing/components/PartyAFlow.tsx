@@ -796,7 +796,7 @@ function DetailsStep({
           }}
         >
           <CornerDownRight size={12} className="text-accent inline-block mr-1 align-text-bottom" />
-          Funds release only when both wallets approve. Neither side can withdraw alone.
+          You can refund the deposit to your counterparty any time; they can release it to you any time. Neither side can pull funds to themselves.
         </div>
 
         <div className="mt-7 flex justify-between border-t border-rule-soft pt-6">
@@ -1243,7 +1243,7 @@ function SignStep({
           style={{ fontSize: 11, lineHeight: 1.5 }}
         >
           <CornerDownRight size={12} className="inline-block mr-1 align-text-bottom" />
-          Funds release only when both wallets approve. We never custody them.
+          Each side can release funds to the other at will. We never custody them.
         </p>
       </div>
     </div>

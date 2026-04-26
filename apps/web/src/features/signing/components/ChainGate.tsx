@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
 import { activeChain } from "@/lib/chain";
+import { isLocalhost } from "@/lib/isLocalhost";
 
 /// Render `children` only when the connected wallet is on the deployment
 /// chain. Otherwise show a switch-network panel - without this, users get
@@ -15,6 +16,7 @@ import { activeChain } from "@/lib/chain";
 export function ChainGate({ children }: { children: ReactNode }) {
   const { chainId } = useAccount();
   const { switchChain, isPending, error } = useSwitchChain();
+  const showRawErrors = isLocalhost();
 
   if (chainId === activeChain.id) {
     return <>{children}</>;
@@ -52,7 +54,7 @@ export function ChainGate({ children }: { children: ReactNode }) {
           className="mt-3 font-mono text-accent"
           style={{ fontSize: 11 }}
         >
-          An error occurred.
+          {showRawErrors ? error.message : "An error occurred."}
         </p>
       )}
     </div>

@@ -4,67 +4,102 @@ import { activeChain, depositToken } from "@/lib/chain";
 
 export const metadata: Metadata = {
   title: "Contract graph - DealSeal",
-  description: "Internal map of the DealSeal contract lifecycle.",
+  description: "Internal map of DealSeal smart-contract call and state flows.",
 };
 
 const lifecycle = [
   {
     state: "AwaitingCounterparty",
     trigger: "createEscrowDeterministic",
-    actor: "Party A",
-    effect: "Clone exists, Party A attestation is stored, share secret hash is committed.",
+    actor: "EscrowFactory -> Escrow",
+    effect:
+      "Factory deploys deterministic clone, then initialize verifies Party A attestation and commits deal params.",
   },
   {
     state: "Active",
     trigger: "countersign",
-    actor: "Party B",
-    effect: "Secret is consumed, Party B attestation is stored, deposit is pulled into escrow.",
+    actor: "Party B -> Escrow",
+    effect:
+      "Escrow checks secret + attestation, pulls deposit, optionally supplies to Aave, and calls factory.recordCountersign.",
   },
   {
     state: "Releasing",
     trigger: "proposeRelease",
-    actor: "Either signer",
-    effect: "One signer says the work is complete; the other signer must approve.",
+    actor: "partyA or partyB",
+    effect: "A signer proposes completion; the other signer must approve.",
   },
   {
     state: "Released",
     trigger: "approveRelease",
     actor: "Other signer",
-    effect: "Principal becomes withdrawable to Party A.",
+    effect: "Escrow marks principal as withdrawable.",
   },
   {
     state: "Closed",
     trigger: "withdraw",
-    actor: "Anyone",
-    effect: "Funds are pulled from escrow/Aave and sent to Party A.",
+    actor: "Anyone (pays partyA)",
+    effect:
+      "Escrow withdraws from Aave if used, routes interest to platformWallet, and transfers principal to partyA.",
   },
-];
+  {
+    state: "Rescued",
+    trigger: "rescue",
+    actor: "partyA or partyB",
+    effect:
+      "After deadline + RESCUE_TIMEOUT, remaining balance can be moved through timeout rescue path.",
+  },
+] as const;
 
-const apiRoutes = [
-  ["/api/ipfs", "Pins the uploaded PDF and stamped audit copies."],
-  ["/api/contracts", "Indexes Party A's deal only after on-chain clone verification."],
-  ["/api/contracts/[address]", "Feeds the counterparty page and dashboard detail views."],
-  ["/api/contracts/[address]/countersign", "Indexes Party B after the chain says countersign landed."],
-  ["/api/contracts/[address]/signed", "Updates the latest human-readable signed PDF CID."],
-  ["/api/contracts/[address]/pdf", "Streams original or stamped PDF from IPFS."],
-];
+const contractCalls = [
+  [
+    "EscrowFactory.createEscrowDeterministic",
+    "cloneDeterministic -> initialize clone -> emit EscrowCreated",
+  ],
+  [
+    "Escrow.countersign",
+    "secret+attestation validation -> transferFrom -> optional Aave supply -> recordCountersign",
+  ],
+  ["Escrow.proposeRelease", "Active -> Releasing; saves proposedReleaseBy"],
+  [
+    "Escrow.approveRelease",
+    "Releasing -> Released; proposer cannot self-approve",
+  ],
+  [
+    "Escrow.withdraw",
+    "Released -> Closed; optional Aave withdraw + interest skim + principal transfer",
+  ],
+  [
+    "Escrow.flagDispute / cancelDispute",
+    "Disputed pause branch with exact prior-state restore",
+  ],
+  ["Escrow.rescue", "Timeout path into Rescued"],
+  [
+    "ReputationView.statsOf",
+    "Reads factory party escrow list + each escrow state/amount",
+  ],
+] as const;
 
 const invariants = [
-  "The PDF hash, token, amount, Party A wallet, deadline, link expiry, and secret hash are immutable after initialize.",
-  "The share URL secret lives in the browser fragment; the server stores only keccak256(secret).",
-  "Party B's signature and deposit settle in the same countersign transaction after token approval.",
-  "The off-chain index is never trusted on write; API routes read the escrow clone before saving state.",
-  "Release needs two distinct signers: the proposer cannot approve their own proposal.",
-  "Dispute pauses Active or Releasing, then cancellation restores the exact previous state.",
-];
+  "token, amount, pdfHash, deadline, validUntil, and secretHash are fixed at initialize.",
+  "Attestations bind wallet + pdfHash + nonce + deadline under clone-specific EIP-712 domain.",
+  "Only deployed clones can call EscrowFactory.recordCountersign via isEscrow gate.",
+  "Release always needs two distinct signers.",
+  "Dispute restore returns to the exact preDisputeState.",
+] as const;
 
-const artifacts = [
-  ["Original PDF", "sha256 committed on chain, CID stored in clone and index."],
-  ["EIP-712 attestations", "Wallet, salted name/email hashes, PDF hash, nonce, deadline."],
-  ["Signed PDF copy", "Best-effort audit artifact with drawn signatures; not the on-chain hash."],
-  ["SQLite index", "Dashboard/search metadata plus names, emails, masked counterparty details."],
-  ["Factory registry", "Escrows by Party A at create time, Party B after countersign."],
-];
+const contractSurfaces = [
+  [
+    "EscrowFactory",
+    "deterministic clone deployment, escrow registry, Aave config accessors",
+  ],
+  [
+    "Escrow",
+    "state machine, attestation checks, deposit/release/dispute/rescue execution",
+  ],
+  ["IPool (Aave)", "optional supply/withdraw branch for supported token only"],
+  ["ReputationView", "read-only aggregation over factory + escrow data"],
+  ["ERC20 token", "safeTransferFrom on countersign, safeTransfer on withdraw/rescue"],
+] as const;
 
 export default function ContractGraphPage() {
   return (
@@ -73,7 +108,7 @@ export default function ContractGraphPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <BrandMark />
           <div className="font-mono text-muted" style={{ fontSize: 11 }}>
-            Hidden internal map / {activeChain.name} / {depositToken.symbol}
+            Hidden internal map / smart contracts only / {activeChain.name} / {depositToken.symbol}
           </div>
         </div>
       </header>
@@ -81,28 +116,19 @@ export default function ContractGraphPage() {
       <section className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-7 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <div
-              className="font-mono uppercase text-accent"
-              style={{ fontSize: 11, letterSpacing: 0 }}
-            >
-              Contract lifecycle graph
+            <div className="font-mono uppercase text-accent" style={{ fontSize: 11 }}>
+              Smart contract flow graph
             </div>
             <h1
               className="mt-2 max-w-4xl font-serif font-normal"
-              style={{ fontSize: 52, lineHeight: 1.05, letterSpacing: 0 }}
+              style={{ fontSize: 52, lineHeight: 1.05 }}
             >
-              How a DealSeal contract moves from uploaded PDF to locked deposit
-              to release.
+              How EscrowFactory, Escrow, Aave, and ReputationView interact on-chain.
             </h1>
           </div>
-          <div
-            className="border border-rule bg-card p-5"
-            style={{ alignSelf: "end" }}
-          >
+          <div className="border border-rule bg-card p-5" style={{ alignSelf: "end" }}>
             <p className="leading-relaxed text-ink/75" style={{ fontSize: 14 }}>
-              Read this left to right. The top lane is the user experience, the
-              middle lane is the app and API index, and the bottom lane is the
-              escrow clone on chain.
+              Left to right is execution order. This graph intentionally excludes UI and API behavior.
             </p>
           </div>
         </div>
@@ -115,8 +141,8 @@ export default function ContractGraphPage() {
       <section className="border-y border-rule bg-paper-2">
         <div className="mx-auto grid max-w-7xl gap-5 px-6 py-7 lg:grid-cols-3">
           <InfoPanel title="Important Invariants" items={invariants} />
-          <RoutePanel />
-          <ArtifactPanel />
+          <InfoPanel title="Contract Calls" items={contractCalls.map(([n, d]) => `${n}: ${d}`)} />
+          <InfoPanel title="Contract Surfaces" items={contractSurfaces.map(([n, d]) => `${n}: ${d}`)} />
         </div>
       </section>
 
@@ -129,16 +155,13 @@ export default function ContractGraphPage() {
             Escrow.sol enum
           </span>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           {lifecycle.map((item) => (
             <div key={item.state} className="border border-rule bg-card p-4">
-              <div
-                className="font-mono uppercase text-accent"
-                style={{ fontSize: 10, letterSpacing: 0 }}
-              >
+              <div className="font-mono uppercase text-accent" style={{ fontSize: 10 }}>
                 {item.trigger}
               </div>
-              <h3 className="mt-2 font-serif font-normal" style={{ fontSize: 24 }}>
+              <h3 className="mt-2 font-serif font-normal" style={{ fontSize: 22 }}>
                 {item.state}
               </h3>
               <div className="mt-2 font-mono text-muted" style={{ fontSize: 11 }}>
@@ -167,61 +190,62 @@ function ContractFlowGraph() {
 
   return (
     <svg
-      viewBox="0 0 1340 720"
+      viewBox="0 0 1340 760"
       width="1340"
-      height="720"
+      height="760"
       role="img"
-      aria-label="Detailed graph of the DealSeal contract flow"
+      aria-label="Detailed graph of DealSeal smart contract flows"
       style={{ display: "block", maxWidth: "none" }}
     >
-      <rect x="0" y="0" width="1340" height="720" fill={card} />
+      <rect x="0" y="0" width="1340" height="760" fill={card} />
 
-      <Lane y={64} label="Party A client" />
-      <Lane y={242} label="API and index" />
-      <Lane y={420} label="Escrow factory and clone" />
-      <Lane y={598} label="Party B client" />
+      <Lane y={70} label="EscrowFactory" />
+      <Lane y={238} label="Escrow clone" />
+      <Lane y={406} label="ERC20 + Aave Pool" />
+      <Lane y={574} label="ReputationView" />
 
-      <Node x={54} y={92} w={184} h={96} title="Upload PDF" lines={["extract fields", "choose token + amount", "draw signature"]} />
-      <Node x={284} y={92} w={210} h={96} title="Hash + attest" lines={["sha256(pdf)", "salt name/email", "sign EIP-712"]} />
-      <Node x={542} y={92} w={220} h={96} title="Deploy clone" lines={["predictAddress(salt)", "createEscrowDeterministic", "wait for receipt"]} tone="accent" />
-      <Node x={810} y={92} w={186} h={96} title="Share link" lines={["/c/escrow#secret", "fragment stays local", "validUntil <= deadline"]} />
+      <Node x={54} y={98} w={274} h={98} title="createEscrowDeterministic" lines={["cloneDeterministic", "initialize clone", "EscrowCreated"]} tone="accent" />
+      <Node x={382} y={98} w={264} h={98} title="Factory registry" lines={["isEscrow[clone] = true", "escrowsByParty[partyA].push", "allEscrows.push"]} />
+      <Node x={700} y={98} w={266} h={98} title="recordCountersign" lines={["clone-auth gate", "escrowsByParty[partyB].push", "EscrowCountersigned"]} tone="green" />
 
-      <Node x={542} y={270} w={220} h={98} title="POST /api/contracts" lines={["readEscrow(address)", "verify state + partyA", "save metadata"]} tone="green" />
-      <Node x={810} y={270} w={186} h={98} title="Counterparty GET" lines={["load index row", "mask email", "stream PDF preview"]} />
-      <Node x={1050} y={270} w={214} h={98} title="POST countersign" lines={["readEscrow again", "verify partyB", "update state + attestation"]} tone="green" />
+      <Node x={54} y={266} w={274} h={104} title="initialize" lines={["verify attestation", "set params", "state AwaitingCounterparty"]} tone="amber" />
+      <Node x={382} y={266} w={264} h={104} title="countersign" lines={["check secret + validUntil", "verify partyB", "state Active"]} tone="accent" />
+      <Node x={700} y={266} w={266} h={104} title="release path" lines={["proposeRelease", "approveRelease", "withdraw"]} tone="green" />
+      <Node x={1020} y={266} w={250} h={104} title="risk path" lines={["flagDispute", "cancelDispute", "rescue"]} />
 
-      <Node x={542} y={448} w={220} h={102} title="Factory" lines={["cloneDeterministic", "registry: Party A", "initialize clone"]} />
-      <Node x={810} y={448} w={186} h={102} title="Awaiting" lines={["partyA set", "pdfHash set", "secretHash set"]} tone="amber" />
-      <Node x={1050} y={448} w={214} h={102} title="Active escrow" lines={["secret consumed", "partyB set", "deposit held/supplied"]} tone="accent" />
+      <Node x={382} y={434} w={264} h={104} title="ERC20 transfers" lines={["transferFrom deposit", "strict amount check", "transfer principal"]} tone="amber" />
+      <Node x={700} y={434} w={266} h={104} title="Aave branch" lines={["supply on countersign", "withdraw on withdraw/rescue", "only supported token"]} tone="green" />
+      <Node x={1020} y={434} w={250} h={104} title="Interest route" lines={["withdrawn - principal", "interest -> platformWallet", "principal -> partyA"]} />
 
-      <Node x={810} y={626} w={186} h={58} title="Review link" lines={["read secret from #"]} />
-      <Node x={1050} y={626} w={214} h={58} title="Sign + deposit" lines={["approve token, then countersign"]} tone="accent" />
+      <Node x={382} y={602} w={264} h={90} title="statsOf(party)" lines={["partyEscrowCount", "escrowsByParty(i)", "read state + amount"]} tone="accent" />
+      <Node x={700} y={602} w={266} h={90} title="Reputation aggregates" lines={["completed/disputed/active", "value tier", "read-only output"]} />
 
-      <Flow fromX={238} fromY={140} toX={284} toY={140} />
-      <Flow fromX={494} fromY={140} toX={542} toY={140} />
-      <Flow fromX={762} fromY={140} toX={810} toY={140} />
-      <Flow fromX={652} fromY={188} toX={652} toY={270} label="index after receipt" />
-      <Flow fromX={652} fromY={448} toX={652} toY={368} />
-      <Flow fromX={762} fromY={497} toX={810} toY={497} />
-      <Flow fromX={903} fromY={550} toX={903} toY={626} />
-      <Flow fromX={996} fromY={655} toX={1050} toY={655} />
-      <Flow fromX={1157} fromY={626} toX={1157} toY={550} label="countersign(secret)" />
-      <Flow fromX={1157} fromY={550} toX={1157} toY={368} label="server verifies" />
-      <Flow fromX={996} fromY={319} toX={1050} toY={319} />
-      <Flow fromX={996} fromY={497} toX={1050} toY={497} />
+      <Flow fromX={328} fromY={146} toX={382} toY={146} />
+      <Flow fromX={646} fromY={146} toX={700} toY={146} label="after countersign" />
 
-      <Branch x={1140} y={430} />
+      <Flow fromX={194} fromY={196} toX={194} toY={266} label="initialize" />
+      <Flow fromX={646} fromY={318} toX={700} toY={318} />
+      <Flow fromX={966} fromY={318} toX={1020} toY={318} />
+
+      <Flow fromX={514} fromY={370} toX={514} toY={434} label="token path" />
+      <Flow fromX={780} fromY={370} toX={780} toY={434} label="optional Aave" />
+      <Flow fromX={966} fromY={486} toX={1020} toY={486} />
+
+      <Flow fromX={514} fromY={538} toX={514} toY={602} label="read model" />
+      <Flow fromX={646} fromY={647} toX={700} toY={647} />
+
+      <StateStrip x={54} y={716} label="Escrow.State: Draft -> AwaitingCounterparty -> Active -> Releasing -> Released -> Disputed/Closed/Rescued" />
 
       <text x="54" y="32" fill={ink} fontFamily="var(--font-serif)" fontSize="28">
-        Main settlement path
+        Solidity call and state topology
       </text>
       <text x="54" y="54" fill={muted} fontFamily="var(--font-mono)" fontSize="11">
-        Solid arrows are required order. Dashed branches are release, dispute, and rescue paths after Active.
+        Solid arrows represent direct contract calls or on-chain state transitions.
       </text>
 
-      <Legend x={1016} y={34} color={accent} label="wallet transaction" />
-      <Legend x={1016} y={56} color={green} label="server verification" />
-      <Legend x={1016} y={78} color={amber} label="on-chain state" />
+      <Legend x={1020} y={34} color={accent} label="state-changing calls" />
+      <Legend x={1020} y={56} color={green} label="cross-contract integration" />
+      <Legend x={1020} y={78} color={amber} label="token and funds semantics" />
 
       <defs>
         <marker
@@ -250,6 +274,17 @@ function ContractFlowGraph() {
     );
   }
 
+  function StateStrip({ x, y, label }: { x: number; y: number; label: string }) {
+    return (
+      <g>
+        <rect x={x} y={y - 20} width="1260" height="30" fill={paper} stroke={rule} />
+        <text x={x + 14} y={y} fill={ink} fontFamily="var(--font-mono)" fontSize="10">
+          {label}
+        </text>
+      </g>
+    );
+  }
+
   function Node({
     x,
     y,
@@ -267,8 +302,16 @@ function ContractFlowGraph() {
     lines: string[];
     tone?: "accent" | "green" | "amber";
   }) {
-    const stroke = tone === "accent" ? accent : tone === "green" ? green : tone === "amber" ? amber : rule;
-    const fill = tone === "accent" ? "rgba(217, 74, 38, 0.055)" : tone === "green" ? "rgba(47, 122, 74, 0.055)" : tone === "amber" ? "rgba(231, 181, 54, 0.075)" : paper;
+    const stroke =
+      tone === "accent" ? accent : tone === "green" ? green : tone === "amber" ? amber : rule;
+    const fill =
+      tone === "accent"
+        ? "rgba(217, 74, 38, 0.055)"
+        : tone === "green"
+          ? "rgba(47, 122, 74, 0.055)"
+          : tone === "amber"
+            ? "rgba(231, 181, 54, 0.075)"
+            : paper;
 
     return (
       <g>
@@ -307,6 +350,7 @@ function ContractFlowGraph() {
   }) {
     const midX = fromX === toX ? fromX : (fromX + toX) / 2;
     const midY = fromY === toY ? fromY - 10 : (fromY + toY) / 2;
+
     return (
       <g>
         <line
@@ -327,65 +371,17 @@ function ContractFlowGraph() {
     );
   }
 
-  function Branch({ x, y }: { x: number; y: number }) {
-    return (
-      <g>
-        <path
-          d={`M ${x} ${y} C ${x + 60} ${y - 42}, ${x + 80} ${y - 110}, ${x + 112} ${y - 150}`}
-          fill="none"
-          stroke={amber}
-          strokeWidth="1.2"
-          strokeDasharray="4 4"
-        />
-        <path
-          d={`M ${x} ${y + 22} C ${x + 62} ${y + 58}, ${x + 84} ${y + 94}, ${x + 112} ${y + 122}`}
-          fill="none"
-          stroke={ink}
-          strokeWidth="1.2"
-          strokeDasharray="4 4"
-        />
-        <path
-          d={`M ${x - 18} ${y + 80} C ${x - 120} ${y + 92}, ${x - 164} ${y + 102}, ${x - 224} ${y + 120}`}
-          fill="none"
-          stroke={accent}
-          strokeWidth="1.2"
-          strokeDasharray="4 4"
-        />
-        <MiniState x={1212} y={236} title="Releasing" note="one signer proposed" />
-        <MiniState x={1212} y={558} title="Released" note="other signer approved" />
-        <MiniState x={850} y={586} title="Disputed" note="pause or restore" accent />
-        <MiniState x={1030} y={586} title="Rescued" note="365d after deadline" />
-      </g>
-    );
-  }
-
-  function MiniState({
+  function Legend({
     x,
     y,
-    title,
-    note,
-    accent: isAccent,
+    color,
+    label,
   }: {
     x: number;
     y: number;
-    title: string;
-    note: string;
-    accent?: boolean;
+    color: string;
+    label: string;
   }) {
-    return (
-      <g>
-        <rect x={x} y={y} width="106" height="54" fill={paper} stroke={isAccent ? accent : rule} />
-        <text x={x + 53} y={y + 22} textAnchor="middle" fill={ink} fontFamily="var(--font-sans)" fontSize="13" fontWeight="600">
-          {title}
-        </text>
-        <text x={x + 53} y={y + 40} textAnchor="middle" fill={muted} fontFamily="var(--font-mono)" fontSize="9">
-          {note}
-        </text>
-      </g>
-    );
-  }
-
-  function Legend({ x, y, color, label }: { x: number; y: number; color: string; label: string }) {
     return (
       <g>
         <rect x={x} y={y - 10} width="10" height="10" fill={color} />
@@ -397,7 +393,7 @@ function ContractFlowGraph() {
   }
 }
 
-function InfoPanel({ title, items }: { title: string; items: string[] }) {
+function InfoPanel({ title, items }: { title: string; items: readonly string[] }) {
   return (
     <div className="border border-rule bg-card p-5">
       <h2 className="font-serif font-normal" style={{ fontSize: 28 }}>
@@ -411,50 +407,6 @@ function InfoPanel({ title, items }: { title: string; items: string[] }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-function RoutePanel() {
-  return (
-    <div className="border border-rule bg-card p-5">
-      <h2 className="font-serif font-normal" style={{ fontSize: 28 }}>
-        API Routes
-      </h2>
-      <div className="mt-4 space-y-3">
-        {apiRoutes.map(([route, detail]) => (
-          <div key={route} className="border-t border-rule-soft pt-3">
-            <div className="font-mono text-accent" style={{ fontSize: 11 }}>
-              {route}
-            </div>
-            <p className="mt-1 text-ink/75" style={{ fontSize: 13, lineHeight: 1.45 }}>
-              {detail}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ArtifactPanel() {
-  return (
-    <div className="border border-rule bg-card p-5">
-      <h2 className="font-serif font-normal" style={{ fontSize: 28 }}>
-        Data Artifacts
-      </h2>
-      <div className="mt-4 space-y-3">
-        {artifacts.map(([name, detail]) => (
-          <div key={name} className="grid grid-cols-[116px_1fr] gap-3 border-t border-rule-soft pt-3">
-            <div className="font-mono text-muted" style={{ fontSize: 11 }}>
-              {name}
-            </div>
-            <p className="text-ink/75" style={{ fontSize: 13, lineHeight: 1.45 }}>
-              {detail}
-            </p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

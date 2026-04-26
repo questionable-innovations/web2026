@@ -1,11 +1,11 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { useState } from "react";
-import { useAccount, useConnect } from "wagmi";
+import { useConnect } from "wagmi";
 import type { Connector } from "wagmi";
 import { useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
+import { useActiveWallet } from "@/lib/active-wallet";
 import { isLocalhost } from "@/lib/isLocalhost";
 
 /// Gate for any flow that requires a connected wallet. Renders a sign-in
@@ -21,7 +21,7 @@ export function WalletGate({
   title?: string;
   blurb?: string;
 }) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useActiveWallet();
   const { connect, connectors, isPending, variables, error } = useConnect();
   const [embeddedPendingKey, setEmbeddedPendingKey] = useState<string | null>(
     null,

@@ -1,17 +1,17 @@
 import { createPublicClient, http, isAddress } from "viem";
 import { normalize } from "viem/ens";
-import { mainnet } from "viem/chains";
+import { sepolia } from "viem/chains";
 
-/// ENS resolution lives on Ethereum mainnet, not Avalanche. We deploy escrows
-/// on Avalanche (where ENS doesn't exist), but resolve names against mainnet
+/// ENS resolution lives on Ethereum sepolia, not Avalanche. We deploy escrows
+/// on Avalanche (where ENS doesn't exist), but resolve names against sepolia
 /// purely for display + reputation indexing. The on-chain trust model stays
 /// address-based; ENS is a UX layer only.
-const mainnetRpc =
-  process.env.ENS_MAINNET_RPC ?? process.env.NEXT_PUBLIC_ENS_MAINNET_RPC;
+const sepoliaRpc =
+  process.env.ENS_SEPOLIA_RPC ?? process.env.NEXT_PUBLIC_ENS_SEPOLIA_RPC;
 
 const ensClient = createPublicClient({
-  chain: mainnet,
-  transport: http(mainnetRpc),
+  chain: sepolia,
+  transport: http(sepoliaRpc),
 });
 
 const ENS_NAME = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
@@ -50,9 +50,9 @@ function writeCache<T>(
 }
 
 /// Reverse-resolve a wallet address to its primary ENS name (e.g. `vitalik.eth`).
-/// Returns null when the address has no primary name set on mainnet, or if the
-/// mainnet RPC is unreachable - display code should fall back to a shortened
-/// address. We deliberately swallow RPC errors so a flaky mainnet endpoint
+/// Returns null when the address has no primary name set on sepolia, or if the
+/// sepolia RPC is unreachable - display code should fall back to a shortened
+/// address. We deliberately swallow RPC errors so a flaky sepolia endpoint
 /// can't break the reputation page.
 export async function reverseResolve(
   address: `0x${string}`,
@@ -108,7 +108,7 @@ export async function forwardResolve(
 }
 
 /// Resolve many addresses at once for list views. Concurrent but bounded -
-/// mainnet RPCs throttle aggressive callers. Order matches input.
+/// sepolia RPCs throttle aggressive callers. Order matches input.
 export async function reverseResolveMany(
   addresses: readonly `0x${string}`[],
 ): Promise<(string | null)[]> {

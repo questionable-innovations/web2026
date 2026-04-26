@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUpRight, Check } from "lucide-react";
 import { readSecretFromHash } from "@/lib/share-link";
-import { BrandMark, PdfThumb, Seal } from "@/components/AppShell";
+import { BrandMark, Seal } from "@/components/AppShell";
 import { PdfViewer } from "./PdfViewer";
 import { SignAndPay } from "./SignAndDeposit";
 import { getDepositTokenByAddress } from "@/lib/chain";

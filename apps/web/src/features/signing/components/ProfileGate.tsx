@@ -15,11 +15,17 @@ export type Profile = {
 /// Captures the legal name + verified email that get committed (as salted
 /// hashes) on every contract this wallet ever signs. Persisted server-side
 /// keyed by wallet so subsequent contracts skip this step entirely.
+///
+/// `prefill` lets the caller seed the onboarding form when the contract
+/// already carries the counterparty's expected name/email - the user can
+/// still edit before saving, and the email re-verifies via OTP.
 export function ProfileGate({
   wallet,
+  prefill,
   children,
 }: {
   wallet: `0x${string}`;
+  prefill?: { name?: string | null; email?: string | null };
   children: (profile: Profile) => ReactNode;
 }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -64,6 +70,7 @@ export function ProfileGate({
   return (
     <Onboarding
       wallet={wallet}
+      prefill={prefill}
       onError={setLoadError}
       onSaved={(p) => setProfile(p)}
       error={loadError}
@@ -73,16 +80,18 @@ export function ProfileGate({
 
 function Onboarding({
   wallet,
+  prefill,
   onSaved,
   onError,
   error,
 }: {
   wallet: `0x${string}`;
+  prefill?: { name?: string | null; email?: string | null };
   onSaved: (p: Profile) => void;
   onError: (msg: string | null) => void;
   error: string | null;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(prefill?.name ?? "");
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -158,7 +167,10 @@ function Onboarding({
           <div className="mb-1.5 text-muted" style={{ fontSize: 11 }}>
             Your email (verified)
           </div>
-          <EmailVerify onVerified={setVerifiedEmail} />
+          <EmailVerify
+            initialEmail={prefill?.email ?? ""}
+            onVerified={setVerifiedEmail}
+          />
 
           <p
             className="mt-3 font-mono text-muted"

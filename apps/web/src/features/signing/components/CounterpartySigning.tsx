@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowRight, ArrowUpRight, Check } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useAccount, useDisconnect } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 import { readSecretFromHash } from "@/lib/share-link";
 import { BrandMark, Seal } from "@/components/AppShell";
 import { PdfViewer } from "./PdfViewer";
@@ -14,7 +15,6 @@ import { getDepositTokenByAddress } from "@/lib/chain";
 
 const POST_SECRET_STATES = new Set([
   "Active",
-  "Releasing",
   "Released",
   "Disputed",
   "Closed",
@@ -29,7 +29,9 @@ type ContractInfo = {
   hasSignedPdf: boolean;
   partyAName: string | null;
   partyAWallet: `0x${string}`;
+  partyBWallet: `0x${string}` | null;
   counterpartyEmailMasked: string | null;
+  counterpartyEmail: string | null;
   counterpartyName: string | null;
   depositAmount: string;
   totalDue: string | null;
@@ -51,24 +53,34 @@ export function CounterpartySigning({ escrowAddress }: { escrowAddress: string }
     setSecret(readSecretFromHash());
   }, []);
 
+  const loadInfo = useCallback(
+    async (signal?: AbortSignal): Promise<ContractInfo | null> => {
+      try {
+        const r = await fetch(`/api/contracts/${escrowAddress}`, { signal });
+        if (!r.ok) throw new Error("not found");
+        const d = (await r.json()) as ContractInfo;
+        if (signal?.aborted) return null;
+        setInfo(d);
+        return d;
+      } catch (err) {
+        if (signal?.aborted) return null;
+        setLoadError(err instanceof Error ? err.message : "load failed");
+        return null;
+      }
+    },
+    [escrowAddress],
+  );
+
   useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/contracts/${escrowAddress}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("not found"))))
-      .then((d) => {
-        if (cancelled) return;
-        setInfo(d as ContractInfo);
-        if (POST_SECRET_STATES.has(d.state)) {
-          setView("done");
-        }
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setLoadError(err.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [escrowAddress]);
+    const controller = new AbortController();
+    loadInfo(controller.signal).then((d) => {
+      if (controller.signal.aborted || !d) return;
+      if (POST_SECRET_STATES.has(d.state)) {
+        setView("done");
+      }
+    });
+    return () => controller.abort();
+  }, [loadInfo]);
 
   if (loadError) {
     return (
@@ -104,7 +116,12 @@ export function CounterpartySigning({ escrowAddress }: { escrowAddress: string }
       <BSignPay
         info={info}
         secret={secret}
-        onDone={() => setView("done")}
+        onDone={() => {
+          setView("done");
+          // Pull fresh state so BReceipt sees partyBWallet, signedPdfCid,
+          // and the post-countersign contract state.
+          void loadInfo();
+        }}
       />
     );
   }
@@ -352,23 +369,33 @@ function BSignPay({
         title="Sign in to seal this deal"
         blurb="Connect a wallet to sign the contract and place the deposit. Your wallet pays the deposit; your signature binds you to the agreement."
       >
-        {(address) => (
-          <ProfileGate wallet={address}>
-            {(profile) => (
-              <ChainGate>
-                <BSignPayLight info={info}>
-                  <SignAndPayForm
-                    info={info}
-                    secret={secret}
-                    wallet={address}
-                    profile={profile}
-                    onDone={onDone}
-                  />
-                </BSignPayLight>
-              </ChainGate>
-            )}
-          </ProfileGate>
-        )}
+        {(address) =>
+          address.toLowerCase() === info.partyAWallet.toLowerCase() ? (
+            <SameWalletGate info={info} />
+          ) : (
+            <ProfileGate
+              wallet={address}
+              prefill={{
+                name: info.counterpartyName,
+                email: info.counterpartyEmail,
+              }}
+            >
+              {(profile) => (
+                <ChainGate>
+                  <BSignPayLight info={info}>
+                    <SignAndPayForm
+                      info={info}
+                      secret={secret}
+                      wallet={address}
+                      profile={profile}
+                      onDone={onDone}
+                    />
+                  </BSignPayLight>
+                </ChainGate>
+              )}
+            </ProfileGate>
+          )
+        }
       </WalletGate>
     </Frame>
   );
@@ -454,6 +481,8 @@ function BSignPayLight({
 
 function BReceipt({ info }: { info: ContractInfo }) {
   const selectedToken = getDepositTokenByAddress(info.depositToken);
+  const selfSigned =
+    info.partyBWallet?.toLowerCase() === info.partyAWallet.toLowerCase();
 
   return (
     <div className="min-h-screen bg-paper px-16 py-8">
@@ -476,6 +505,8 @@ function BReceipt({ info }: { info: ContractInfo }) {
           </span>
         </div>
       </div>
+
+      {selfSigned && <SelfSignedBanner info={info} />}
 
       <div
         className="grid items-center gap-12"
@@ -505,8 +536,8 @@ function BReceipt({ info }: { info: ContractInfo }) {
             style={{ fontSize: 16, color: "rgba(10,10,10,0.7)" }}
           >
             Not paid to {info.partyAName ?? "Party A"} yet. Funds release only
-            when both of you approve. You can verify the deposit on-chain right
-            now.
+            when you release it to {info.partyAName ?? "Party A"}, or when
+            they refund you. You can verify the deposit on-chain right now.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -571,7 +602,7 @@ function BReceipt({ info }: { info: ContractInfo }) {
                 v={`${info.totalDue} ${selectedToken.symbol}`}
               />
             )}
-            <ReceiptRow k="release" v="requires both signatures" />
+            <ReceiptRow k="release" v="you decide when to release" />
           </div>
           <a
             href={`/api/contracts/${info.escrowAddress}/pdf?signed=1`}
@@ -600,6 +631,121 @@ function BReceipt({ info }: { info: ContractInfo }) {
       </div>
     </div>
   );
+}
+
+/// Shown when the wallet that connected inside BSignPay's WalletGate is the
+/// same address that created the deal. Without this guard the user can
+/// successfully countersign their own escrow (the on-chain contract doesn't
+/// reject same-wallet); the resulting "Active" state then short-circuits any
+/// future visit to BReceipt with no indication of what happened.
+function SameWalletGate({ info }: { info: ContractInfo }) {
+  const { disconnect, isPending } = useDisconnect();
+  const privy = useSafePrivy();
+  const partyA = info.partyAName ?? "Party A";
+  const counterparty = info.counterpartyName ?? "the counterparty";
+
+  function switchWallet() {
+    if (privy?.authenticated) privy.logout();
+    disconnect();
+  }
+
+  return (
+    <div className="border border-rule bg-card p-7">
+      <div
+        className="ds-eyebrow mb-2"
+        style={{ color: "var(--color-accent)" }}
+      >
+        Wrong wallet
+      </div>
+      <h2
+        className="font-serif font-normal"
+        style={{ fontSize: 28, lineHeight: 1.15, letterSpacing: -0.5 }}
+      >
+        That&apos;s the wallet that{" "}
+        <em className="text-accent not-italic">created</em> this deal.
+      </h2>
+      <p
+        className="mt-2.5 max-w-md leading-relaxed text-ink/70"
+        style={{ fontSize: 14 }}
+      >
+        You&apos;re signed in as <strong className="text-ink">{partyA}</strong>{" "}
+        (
+        <span className="font-mono" style={{ fontSize: 12 }}>
+          {info.partyAWallet.slice(0, 6)}…{info.partyAWallet.slice(-4)}
+        </span>
+        ). The counterparty signature has to come from a different wallet —
+        otherwise both sides of the escrow are controlled by the same key and
+        there&apos;s no real second party to bind.
+      </p>
+      <p
+        className="mt-2 max-w-md leading-relaxed text-ink/70"
+        style={{ fontSize: 14 }}
+      >
+        Sign out and reconnect with the wallet you want to use as{" "}
+        <strong className="text-ink">{counterparty}</strong>.
+      </p>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={switchWallet}
+          disabled={isPending}
+          className="bg-ink px-5 py-3 text-paper disabled:opacity-50"
+          style={{ fontSize: 13 }}
+        >
+          {isPending ? "Disconnecting…" : "Use a different wallet"}
+        </button>
+        <a
+          href="/contracts"
+          className="font-mono text-muted hover:text-ink"
+          style={{ fontSize: 11, letterSpacing: 0.08 }}
+        >
+          Or open my contracts →
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/// Banner on the receipt view when partyB ended up equal to partyA on-chain.
+/// In production this shouldn't occur, but during testing people often sign
+/// their own deal with the same wallet and then can't tell why the page
+/// short-circuits to "held in escrow". Surface it explicitly so the receipt
+/// doesn't masquerade as a real countersignature.
+function SelfSignedBanner({ info }: { info: ContractInfo }) {
+  return (
+    <div
+      className="mb-6 border bg-card p-5"
+      style={{ borderColor: "var(--color-accent)" }}
+    >
+      <div
+        className="ds-eyebrow mb-1.5"
+        style={{ color: "var(--color-accent)" }}
+      >
+        Self-signed · test deal
+      </div>
+      <p
+        className="max-w-2xl leading-relaxed text-ink/80"
+        style={{ fontSize: 14 }}
+      >
+        Both parties on this escrow resolved to the same wallet (
+        <span className="font-mono" style={{ fontSize: 12 }}>
+          {info.partyAWallet.slice(0, 6)}…{info.partyAWallet.slice(-4)}
+        </span>
+        ). The signature and deposit went through, but a deal where one wallet
+        controls both sides isn&apos;t enforceable in the way a real
+        countersignature would be. To test the end-to-end flow, deploy a fresh
+        deal and open the share link in a different wallet.
+      </p>
+    </div>
+  );
+}
+
+function useSafePrivy() {
+  try {
+    return usePrivy();
+  } catch {
+    return null;
+  }
 }
 
 function formatExpiry(deadlineSecs: number | null): string {

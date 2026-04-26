@@ -95,7 +95,6 @@ export async function GET(
 
     const isPostCountersign =
       r.state === "Active" ||
-      r.state === "Releasing" ||
       r.state === "Released" ||
       r.state === "Closed" ||
       r.state === "Disputed" ||
@@ -118,7 +117,7 @@ export async function GET(
     } else if (r.state === "Disputed") {
       disputed++;
       roleStats.disputed++;
-    } else if (r.state === "Active" || r.state === "Releasing") {
+    } else if (r.state === "Active") {
       active++;
       roleStats.active++;
     }

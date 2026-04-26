@@ -32,7 +32,6 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
         Draft,
         AwaitingCounterparty,
         Active,
-        Releasing,
         Released,
         Disputed,
         Closed,
@@ -74,7 +73,7 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
 
     State public state;
     State public preDisputeState;
-    address public proposedReleaseBy;
+    address public releaseRecipient;
     address public disputedBy;
     string public disputeReason;
     uint256 public withdrawable;
@@ -84,8 +83,7 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
 
     event Initialized(address indexed partyA, IERC20 token, uint256 amount);
     event Countersigned(address indexed signer, bytes32 nameHash, bytes32 emailHash);
-    event ReleaseProposed(address indexed by);
-    event ReleaseApproved(address indexed by, uint256 amount);
+    event Released(address indexed by, address indexed to, uint256 amount);
     event Withdrawn(address indexed to, uint256 amount);
     event Disputed(address indexed by, string reason);
     event DisputeCancelled(address indexed by);
@@ -93,6 +91,7 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
 
     error WrongState(State expected, State actual);
     error NotPartyA();
+    error NotPartyB();
     error NotASigner();
     error LinkExpired();
     error BadSecret();
@@ -102,7 +101,6 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
     error TransferAmountMismatch();
     error RescueTimeoutNotReached();
     error NothingToWithdraw();
-    error CannotApproveOwnProposal();
     error InvalidInit();
     error NotDisputer();
     error AaveShortfall();
@@ -208,27 +206,35 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
         emit Countersigned(msg.sender, partyBAttestation.nameHash, partyBAttestation.emailHash);
     }
 
-    function proposeRelease() external inState(State.Active) {
-        if (msg.sender != partyA && msg.sender != partyB) revert NotASigner();
-        proposedReleaseBy = msg.sender;
-        state = State.Releasing;
-        emit ReleaseProposed(msg.sender);
-    }
-
-    /// @notice Counterparty approves; funds become withdrawable to partyA (pull).
-    function approveRelease() external inState(State.Releasing) {
-        if (msg.sender != partyA && msg.sender != partyB) revert NotASigner();
-        if (msg.sender == proposedReleaseBy) revert CannotApproveOwnProposal();
+    /// @notice Party B (the depositor) releases the deposit to Party A.
+    ///         Unilateral by design — the recipient is being given funds, so
+    ///         their consent isn't required. Self-release is impossible:
+    ///         only B may call, and the recipient is hardcoded to A.
+    function releaseToA() external inState(State.Active) {
+        if (msg.sender != partyB) revert NotPartyB();
         state = State.Released;
         withdrawable = amount;
-        emit ReleaseApproved(msg.sender, amount);
+        releaseRecipient = partyA;
+        emit Released(msg.sender, partyA, amount);
     }
 
-    /// @notice Pull-payment for partyA after release. Anyone may call on behalf;
-    ///         funds always flow to partyA.
+    /// @notice Party A refunds the deposit back to Party B. Mirror image of
+    ///         releaseToA — A is giving up their claim on the funds, so B's
+    ///         consent isn't required. Only callable by A; recipient is B.
+    function refundToB() external inState(State.Active) {
+        if (msg.sender != partyA) revert NotPartyA();
+        state = State.Released;
+        withdrawable = amount;
+        releaseRecipient = partyB;
+        emit Released(msg.sender, partyB, amount);
+    }
+
+    /// @notice Pull-payment after release. Anyone may call on behalf; funds
+    ///         flow to whichever party was set as the release recipient.
     function withdraw() external nonReentrant inState(State.Released) {
         uint256 amt = withdrawable;
         if (amt == 0) revert NothingToWithdraw();
+        address recipient = releaseRecipient;
         withdrawable = 0;
         state = State.Closed;
 
@@ -237,8 +243,8 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
             // Pull principal + interest out of Aave in one call. If the pool
             // returns less than the principal (frozen / capped / paused),
             // revert the whole tx — the state mutations above unwind, so
-            // partyA can retry once Aave is healthy. We never silently send
-            // less than the released amount.
+            // the recipient can retry once Aave is healthy. We never silently
+            // send less than the released amount.
             uint256 totalWithdrawn =
                 IPool(aavePool).withdraw(address(token), type(uint256).max, address(this));
             if (totalWithdrawn < amt) revert AaveShortfall();
@@ -248,15 +254,12 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
             }
         }
 
-        token.safeTransfer(partyA, amt);
-        emit Withdrawn(partyA, amt);
+        token.safeTransfer(recipient, amt);
+        emit Withdrawn(recipient, amt);
     }
 
-    function flagDispute(string calldata reason) external {
+    function flagDispute(string calldata reason) external inState(State.Active) {
         if (msg.sender != partyA && msg.sender != partyB) revert NotASigner();
-        if (state != State.Active && state != State.Releasing) {
-            revert WrongState(State.Active, state);
-        }
         preDisputeState = state;
         state = State.Disputed;
         disputedBy = msg.sender;
@@ -265,22 +268,14 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
     }
 
     /// @notice Only the party who flagged the dispute may withdraw it.
-    ///         Restores the *exact* prior state so a dispute raised mid-
-    ///         release doesn't silently revert the counterparty's pending
-    ///         proposal — they'd have to repropose otherwise (grief vector).
+    ///         Restores the prior state (always Active under the symmetric
+    ///         release model — flagDispute only fires from Active).
     function cancelDispute() external inState(State.Disputed) {
         if (msg.sender != disputedBy) revert NotDisputer();
-        State prior = preDisputeState;
-        state = prior;
+        state = preDisputeState;
         preDisputeState = State.Draft;
         disputedBy = address(0);
         disputeReason = "";
-        // If we're not returning to Releasing, the prior proposal (if any)
-        // is no longer meaningful — clear it so a stale `proposedReleaseBy`
-        // doesn't shadow a fresh proposeRelease/approveRelease pairing.
-        if (prior != State.Releasing) {
-            proposedReleaseBy = address(0);
-        }
         emit DisputeCancelled(msg.sender);
     }
 

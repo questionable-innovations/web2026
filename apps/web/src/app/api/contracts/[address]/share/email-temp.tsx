@@ -1,21 +1,22 @@
 import * as React from "react";
 
-interface ReleaseProposalEmailProps {
+interface ShareLinkEmailProps {
   recipientName: string | null;
-  proposerName: string;
+  senderName: string | null;
   title: string;
   amount: string;
   url: string;
 }
 
-export function ReleaseProposalEmail({
+export function ShareLinkEmail({
   recipientName,
-  proposerName,
+  senderName,
   title,
   amount,
   url,
-}: ReleaseProposalEmailProps) {
+}: ShareLinkEmailProps) {
   const greeting = recipientName ? `Hi ${recipientName},` : "Hi there,";
+  const sender = senderName ?? "Your counterparty";
   return (
     <div
       style={{
@@ -38,14 +39,14 @@ export function ReleaseProposalEmail({
       <hr />
       <p style={{ margin: "16px 0 6px", fontSize: "16px" }}>{greeting}</p>
       <p style={{ margin: "0 0 14px", fontSize: "16px" }}>
-        {proposerName} has marked <strong>{title}</strong> complete and
-        proposed releasing the <strong>${amount}</strong> you placed in
-        escrow.
+        {sender} signed <strong>{title}</strong> and is ready for you to
+        countersign. The deposit you&apos;ll place into escrow is{" "}
+        <strong>${amount}</strong>.
       </p>
       <p style={{ margin: "0 0 18px", fontSize: "15px", color: "#374151" }}>
-        If the work is done, approve below: one tap, no wallet hunt. If
-        something&apos;s wrong, you can flag a dispute and the funds stay in
-        escrow until you both agree.
+        Open the link below to review the document, sign, and place the
+        deposit in one transaction. After signing, you decide when to release
+        the deposit; {sender} can refund it back to you at any time.
       </p>
       <a
         href={url}
@@ -59,7 +60,7 @@ export function ReleaseProposalEmail({
           fontSize: "15px",
         }}
       >
-        Approve release
+        Review &amp; sign
       </a>
       <p
         style={{
@@ -67,6 +68,7 @@ export function ReleaseProposalEmail({
           fontSize: "12px",
           color: "#6b7280",
           fontFamily: "monospace",
+          wordBreak: "break-all",
         }}
       >
         Or open: {url}
@@ -78,7 +80,8 @@ export function ReleaseProposalEmail({
           color: "#6b7280",
         }}
       >
-        Funds release only when both wallets approve. We never custody them.
+        The link is a bearer secret — anyone who has it can countersign on
+        your behalf. Don&apos;t forward it.
       </p>
     </div>
   );

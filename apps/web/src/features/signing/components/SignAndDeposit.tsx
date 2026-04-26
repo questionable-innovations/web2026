@@ -166,50 +166,43 @@ export function SignAndPayForm({
         functionName: "countersign",
         args: [secret, attestation, signature],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      const countersignReceipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+      if (countersignReceipt.status !== "success") {
+        throw new Error("Countersign reverted on-chain");
+      }
 
-      const attestationStructHash = (await publicClient.readContract({
-        address: info.escrowAddress,
-        abi: escrowAbi,
-        functionName: "hashAttestation",
-        args: [attestation],
-      })) as `0x${string}`;
+      // Retry to ride out RPC node propagation lag between the receipt and
+      // the immediate read on a multi-node provider.
+      let attestationStructHash!: `0x${string}`;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          attestationStructHash = (await publicClient.readContract({
+            address: info.escrowAddress,
+            abi: escrowAbi,
+            functionName: "hashAttestation",
+            args: [attestation],
+          })) as `0x${string}`;
+          break;
+        } catch (err) {
+          if (attempt === 2) throw err;
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        }
+      }
 
       // Persist Party B's countersign to the off-chain index. State moves
       // Awaiting → Active here; partyBWallet now resolves on the dashboard.
-      const countersignRes = await fetch(
-        `/api/contracts/${info.escrowAddress}/countersign`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            partyB: {
-              wallet,
-              name: profile.name,
-              email: profile.email,
-              attestationHash: attestationStructHash,
-            },
-          }),
-        },
-      );
-      if (!countersignRes.ok) {
-        let message = "Failed to save countersign";
-        try {
-          const payload = (await countersignRes.json()) as { error?: unknown };
-          if (typeof payload?.error === "string") {
-            message = payload.error;
-          }
-        } catch {
-          // Keep the generic fallback if the response isn't JSON.
-        }
-        console.error("Countersign index save failed", {
-          escrowAddress: info.escrowAddress,
-          status: countersignRes.status,
-          statusText: countersignRes.statusText,
-          message,
-        });
-        throw new Error(message);
-      }
+      // Retry through transient failures (network blip, 5xx, server RPC
+      // briefly a block behind the wallet's RPC) so a momentary glitch
+      // doesn't leave the DB un-synced and Party A stuck on "waiting for
+      // countersign" until the next read-time self-heal.
+      await postCountersignWithRetry(info.escrowAddress, {
+        wallet,
+        name: profile.name,
+        email: profile.email,
+        attestationHash: attestationStructHash,
+      });
 
       // Stamp B's Quick Sign block onto the existing signed PDF (which
       // carries A's block) and re-pin. On-chain pdfHash is unchanged -
@@ -495,4 +488,79 @@ function KV({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
       <span className={accent ? "text-accent" : undefined}>{v}</span>
     </div>
   );
+}
+
+type PartyBPayload = {
+  wallet: `0x${string}`;
+  name: string;
+  email: string;
+  attestationHash: `0x${string}`;
+};
+
+/// POST the countersign index update with backoff. The server already polls
+/// for on-chain state propagation, but the network round-trip itself can
+/// drop (mobile flake, ad-blocker, server cold-start) - and Party A's view
+/// is gated on this row update. The read-time self-heal in
+/// `/api/contracts/[address]` covers a permanent drop, but retrying here
+/// closes the window during which Party A would still see stale state.
+async function postCountersignWithRetry(
+  escrowAddress: string,
+  partyB: PartyBPayload,
+): Promise<void> {
+  const url = `/api/contracts/${escrowAddress}/countersign`;
+  const body = JSON.stringify({ partyB });
+  const MAX_ATTEMPTS = 4;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const isLast = attempt === MAX_ATTEMPTS - 1;
+    let outcome: { kind: "retry" | "fail"; error: Error };
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      });
+      if (res.ok) return;
+
+      let message = "Failed to save countersign";
+      try {
+        const payload = (await res.clone().json()) as { error?: unknown };
+        if (typeof payload?.error === "string") message = payload.error;
+      } catch {
+        // Keep the generic fallback if the response isn't JSON.
+      }
+      // 5xx or a 409 on a stale-state read is transient. Other 4xx is a
+      // semantic mismatch (wrong wallet, factory mismatch, schema fail) -
+      // no point hammering the server.
+      const transient =
+        res.status >= 500 ||
+        (res.status === 409 &&
+          /not yet countersigned|escrow not deployed/i.test(message));
+      outcome = { kind: transient ? "retry" : "fail", error: new Error(message) };
+      console[transient && !isLast ? "warn" : "error"](
+        "Countersign index save failed",
+        {
+          escrowAddress,
+          status: res.status,
+          statusText: res.statusText,
+          message,
+          attempt: attempt + 1,
+        },
+      );
+    } catch (err) {
+      // fetch itself threw - network error, always transient.
+      outcome = {
+        kind: "retry",
+        error: err instanceof Error ? err : new Error(String(err)),
+      };
+      console[isLast ? "error" : "warn"]("Countersign index save network error", {
+        escrowAddress,
+        attempt: attempt + 1,
+        err,
+      });
+    }
+
+    if (outcome.kind === "fail" || isLast) throw outcome.error;
+    await new Promise((r) => setTimeout(r, 600 * 2 ** attempt));
+  }
 }

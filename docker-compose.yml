@@ -3,6 +3,26 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # NEXT_PUBLIC_* values must be present at build time so Next.js can
+      # inline them into the client bundle. env_file only takes effect at
+      # runtime, which is too late for client code. Compose interpolates
+      # ${VAR} from the .env file adjacent to this compose file.
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_CHAIN_ID: ${NEXT_PUBLIC_CHAIN_ID}
+        NEXT_PUBLIC_RPC_URL: ${NEXT_PUBLIC_RPC_URL}
+        NEXT_PUBLIC_ESCROW_FACTORY: ${NEXT_PUBLIC_ESCROW_FACTORY}
+        NEXT_PUBLIC_CONTRACT_REGISTRY: ${NEXT_PUBLIC_CONTRACT_REGISTRY}
+        NEXT_PUBLIC_DEPOSIT_TOKEN: ${NEXT_PUBLIC_DEPOSIT_TOKEN}
+        NEXT_PUBLIC_DEPOSIT_TOKEN_SYMBOL: ${NEXT_PUBLIC_DEPOSIT_TOKEN_SYMBOL}
+        NEXT_PUBLIC_DEPOSIT_TOKEN_DECIMALS: ${NEXT_PUBLIC_DEPOSIT_TOKEN_DECIMALS}
+        NEXT_PUBLIC_DNZD_TOKEN: ${NEXT_PUBLIC_DNZD_TOKEN}
+        NEXT_PUBLIC_DNZD_TOKEN_DECIMALS: ${NEXT_PUBLIC_DNZD_TOKEN_DECIMALS}
+        NEXT_PUBLIC_USDC_TOKEN: ${NEXT_PUBLIC_USDC_TOKEN}
+        NEXT_PUBLIC_USDC_TOKEN_DECIMALS: ${NEXT_PUBLIC_USDC_TOKEN_DECIMALS}
+        NEXT_PUBLIC_AUSDC_TOKEN: ${NEXT_PUBLIC_AUSDC_TOKEN}
+        NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID}
+        NEXT_PUBLIC_IPFS_GATEWAY: ${NEXT_PUBLIC_IPFS_GATEWAY}
     ports:
       - "3000:3000"
     env_file:

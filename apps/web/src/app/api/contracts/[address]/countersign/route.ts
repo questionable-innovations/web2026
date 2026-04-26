@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { contracts, attestations } from "@/server/db/schema";
-import { readEscrow } from "@/lib/server-chain";
+import { readEscrow, type OnchainEscrow } from "@/lib/server-chain";
 
 const Body = z.object({
   partyB: z.object({
@@ -37,10 +37,20 @@ export async function POST(
   const partyB = parsed.data.partyB;
 
   // Verify on-chain that this wallet really is partyB and the countersign
-  // tx landed before persisting to the index.
-  const onchain = await readEscrow(address as `0x${string}`).catch(
-    () => null,
-  );
+  // tx landed before persisting to the index. The client only POSTs after
+  // its own waitForTransactionReceipt resolves, so the tx is mined - but
+  // our RPC may be a block behind the wallet's RPC, returning a stale
+  // pre-countersign state. Poll briefly for propagation rather than 409'ing
+  // the user back to a failed-error UI for a transient lag.
+  let onchain = await readEscrow(address as `0x${string}`).catch(() => null);
+  for (
+    let attempt = 0;
+    attempt < 4 && stateLooksStale(onchain);
+    attempt++
+  ) {
+    await new Promise((r) => setTimeout(r, 500));
+    onchain = await readEscrow(address as `0x${string}`).catch(() => onchain);
+  }
   if (!onchain) {
     return NextResponse.json(
       { error: "escrow not deployed" },
@@ -71,14 +81,37 @@ export async function POST(
     })
     .where(eq(contracts.id, row.id));
 
-  await db.insert(attestations).values({
-    id: randomUUID(),
-    contractId: row.id,
-    wallet: partyB.wallet.toLowerCase(),
-    name: partyB.name,
-    email: partyB.email,
-    attestationHash: partyB.attestationHash,
-  });
+  // Idempotent: the client retries this POST through transient failures, so
+  // a second landing must not pile up duplicate attestation rows for the
+  // same (contract, wallet) pair.
+  const wallet = partyB.wallet.toLowerCase();
+  const existing = (
+    await db
+      .select({ id: attestations.id })
+      .from(attestations)
+      .where(
+        and(
+          eq(attestations.contractId, row.id),
+          eq(attestations.wallet, wallet),
+        ),
+      )
+      .limit(1)
+  )[0];
+  if (!existing) {
+    await db.insert(attestations).values({
+      id: randomUUID(),
+      contractId: row.id,
+      wallet,
+      name: partyB.name,
+      email: partyB.email,
+      attestationHash: partyB.attestationHash,
+    });
+  }
 
   return NextResponse.json({ ok: true });
+}
+
+function stateLooksStale(onchain: OnchainEscrow | null): boolean {
+  if (!onchain) return true;
+  return onchain.state === "AwaitingCounterparty" || onchain.state === "Draft";
 }

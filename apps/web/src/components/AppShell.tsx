@@ -12,7 +12,6 @@ export type ContractState =
   | "Awaiting B"
   | "AwaitingCounterparty"
   | "Active"
-  | "Releasing"
   | "Released"
   | "Closed"
   | "Disputed"
@@ -93,7 +92,6 @@ const stateMap: Record<ContractState, { bg: string; fg: string }> = {
     fg: "var(--color-accent)",
   },
   Active: { bg: "var(--color-green-soft)", fg: "var(--color-green)" },
-  Releasing: { bg: "var(--color-amber-soft)", fg: "var(--color-amber)" },
   Released: { bg: "var(--color-ink)", fg: "var(--color-paper)" },
   Closed: { bg: "var(--color-ink)", fg: "var(--color-paper)" },
   Disputed: { bg: "var(--color-accent)", fg: "#fff" },

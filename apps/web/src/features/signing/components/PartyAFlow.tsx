@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -77,6 +77,30 @@ const STEPS: [string, Stage[]][] = [
   ["Sign", ["sign", "deploying", "registering"]],
   ["Send", ["share"]],
 ];
+
+// Keep currency fields strictly decimal so letters never enter state.
+function sanitizeDecimalInput(value: string): string {
+  const cleaned = value.replace(/[^\d.]/g, "");
+  const parts = cleaned.split(".");
+  if (parts.length <= 1) return cleaned;
+  return `${parts[0]}.${parts.slice(1).join("")}`;
+}
+
+function blockNonDecimalKey(e: KeyboardEvent<HTMLInputElement>) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const allowedControl = [
+    "Backspace",
+    "Delete",
+    "ArrowLeft",
+    "ArrowRight",
+    "Tab",
+    "Home",
+    "End",
+  ];
+  if (allowedControl.includes(e.key)) return;
+  if (e.key === "." || /^\d$/.test(e.key)) return;
+  e.preventDefault();
+}
 
 /// Wallet-first entry point. Anyone uploading a PDF must first prove they
 /// hold a wallet - that wallet becomes Party A's identity, the EIP-712
@@ -288,8 +312,12 @@ function DetailsStep({
   const [counterpartyEmail, setCounterpartyEmail] = useState(
     initial?.counterpartyEmail ?? "",
   );
-  const [amount, setAmount] = useState(initial?.amount ?? "");
-  const [totalDue, setTotalDue] = useState(initial?.totalDue ?? "");
+  const [amount, setAmount] = useState(() =>
+    sanitizeDecimalInput(initial?.amount ?? ""),
+  );
+  const [totalDue, setTotalDue] = useState(() =>
+    sanitizeDecimalInput(initial?.totalDue ?? ""),
+  );
   const [depositTokenId, setDepositTokenId] = useState(
     initial?.depositToken.id ?? depositToken.id,
   );
@@ -320,8 +348,10 @@ function DetailsStep({
         if (data.title) setTitle(data.title);
         if (data.counterpartyName) setCounterpartyName(data.counterpartyName);
         if (data.counterpartyEmail) setCounterpartyEmail(data.counterpartyEmail);
-        if (data.amount) setAmount(String(data.amount));
-        if (data.totalDue) setTotalDue(String(data.totalDue));
+        if (data.amount) setAmount(sanitizeDecimalInput(String(data.amount)));
+        if (data.totalDue) {
+          setTotalDue(sanitizeDecimalInput(String(data.totalDue)));
+        }
         if (data.daysUntilDeadline) setDays(String(data.daysUntilDeadline));
       } else {
         const errText = await res.text();
@@ -464,8 +494,9 @@ function DetailsStep({
           </span>
           <input
             inputMode="decimal"
+            onKeyDown={blockNonDecimalKey}
             value={totalDue}
-            onChange={(e) => setTotalDue(e.target.value)}
+            onChange={(e) => setTotalDue(sanitizeDecimalInput(e.target.value))}
             placeholder="10,000.00"
             className="flex-1 bg-transparent font-serif outline-none"
             style={{ fontSize: 32, lineHeight: 1 }}
@@ -494,8 +525,9 @@ function DetailsStep({
             <input
               required
               inputMode="decimal"
+              onKeyDown={blockNonDecimalKey}
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setAmount(sanitizeDecimalInput(e.target.value))}
               placeholder="4,800.00"
               className="flex-1 bg-transparent font-serif outline-none"
               style={{ fontSize: 32, lineHeight: 1 }}

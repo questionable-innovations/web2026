@@ -18,9 +18,22 @@ type Stats = {
   completed: number;
   disputed: number;
   active: number;
+  completionRate: number;
   disputeRate: number;
   valueTier: ValueTier;
   firstSeen: number | null;
+  roles: {
+    issuer: RoleStats;
+    counterparty: RoleStats;
+  };
+};
+
+type RoleStats = {
+  completed: number;
+  disputed: number;
+  active: number;
+  completionRate: number;
+  disputeRate: number;
 };
 
 type HistoryEntry = {
@@ -118,6 +131,7 @@ export function ReputationCard({ wallet }: { wallet: string }) {
     ? new Date(stats.firstSeen * 1000).toISOString().slice(0, 10)
     : "-";
   const tierName = TIER_NAME[stats.valueTier];
+  const consumerSignal = consumerTrustSignal(stats.roles.counterparty);
   const headline = pickAddressLabel({
     profileName: displayName,
     ensName,
@@ -179,12 +193,13 @@ export function ReputationCard({ wallet }: { wallet: string }) {
       >
         <div>
           <div
-            className="grid grid-cols-3 border border-rule"
-            style={{ gap: 1, background: "var(--color-rule)" }}
+            className="grid border border-rule"
+            style={{ gap: 1, background: "var(--color-rule)", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
           >
             {[
               [String(stats.completed), "Completed", "var(--color-accent)"],
               [String(stats.disputed), "Disputed", "var(--color-ink)"],
+              [`${stats.completionRate.toFixed(1)}%`, "Completion rate", "var(--color-green)"],
               [`${stats.disputeRate.toFixed(1)}%`, "Dispute rate", "var(--color-ink)"],
             ].map(([v, l, c]) => (
               <div key={l} className="bg-card px-5 py-6">
@@ -252,6 +267,23 @@ export function ReputationCard({ wallet }: { wallet: string }) {
         <div className="flex flex-col gap-6">
           {ensProfile && <EnsProfileCard profile={ensProfile} variant="compact" />}
           <div className="border border-rule bg-card p-6">
+            <div className="mb-2 font-mono uppercase text-muted" style={{ fontSize: 10, letterSpacing: 1.5 }}>
+              Independent trust signal
+            </div>
+            <div className="font-serif text-ink" style={{ fontSize: 28, lineHeight: 1.1 }}>
+              {consumerSignal.label}
+            </div>
+            <div className="mt-2 text-sm text-muted">
+              {consumerSignal.reason}
+            </div>
+            <div className="mt-4 border border-rule bg-paper px-4 py-3 font-mono text-muted" style={{ fontSize: 11, lineHeight: 1.6 }}>
+              <div>Consumer role completed: {stats.roles.counterparty.completed}</div>
+              <div>Consumer role disputed: {stats.roles.counterparty.disputed}</div>
+              <div>Consumer completion rate: {stats.roles.counterparty.completionRate.toFixed(1)}%</div>
+              <div>Consumer dispute rate: {stats.roles.counterparty.disputeRate.toFixed(1)}%</div>
+            </div>
+          </div>
+          <div className="border border-rule bg-card p-6">
             <div
               className="mb-4 flex items-baseline justify-between"
             >
@@ -315,6 +347,32 @@ export function ReputationCard({ wallet }: { wallet: string }) {
       </div>
     </div>
   );
+}
+
+function consumerTrustSignal(consumer: RoleStats): { label: string; reason: string } {
+  const counted = consumer.completed + consumer.disputed;
+  if (counted === 0) {
+    return {
+      label: "Insufficient history",
+      reason: "No completed or disputed contracts in the counterparty role yet.",
+    };
+  }
+  if (consumer.completed >= 3 && consumer.disputeRate <= 5) {
+    return {
+      label: "Likely trustworthy consumer",
+      reason: "Consistent completion history with very low dispute rate as counterparty.",
+    };
+  }
+  if (consumer.disputeRate <= 15) {
+    return {
+      label: "Moderate consumer risk",
+      reason: "Mixed outcomes as counterparty. Review full sealed history before proceeding.",
+    };
+  }
+  return {
+    label: "Elevated consumer risk",
+    reason: "High dispute rate as counterparty compared with completed contracts.",
+  };
 }
 
 function StatePill({ state }: { state: string }) {

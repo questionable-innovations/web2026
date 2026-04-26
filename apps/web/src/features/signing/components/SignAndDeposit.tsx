@@ -2,13 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { ArrowRight, Check, CornerDownRight } from "lucide-react";
-import {
-  usePublicClient,
-  useReadContract,
-  useSignTypedData,
-  useWriteContract,
-} from "wagmi";
+import { usePublicClient, useReadContract } from "wagmi";
 import { formatUnits } from "viem";
+import { useActiveWallet } from "@/lib/active-wallet";
 import {
   buildAttestation,
   eip712Domain,
@@ -87,8 +83,7 @@ function Inner({
   const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
   const publicClient = usePublicClient();
-  const { signTypedDataAsync } = useSignTypedData();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContract, signTypedData } = useActiveWallet();
 
   const [confirm, setConfirm] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
@@ -157,7 +152,7 @@ function Inner({
         (allowance as bigint) < amt
       ) {
         setStage("approving");
-        const approveHash = await writeContractAsync({
+        const approveHash = await writeContract({
           address: info.depositToken,
           abi: erc20Abi,
           functionName: "approve",
@@ -177,7 +172,7 @@ function Inner({
         emailSalt,
         pdfHash: info.pdfHash,
       });
-      const signature = await signTypedDataAsync({
+      const signature = await signTypedData({
         domain: eip712Domain(chainId, info.escrowAddress),
         types: eip712Types,
         primaryType: "Attestation",
@@ -185,7 +180,7 @@ function Inner({
       });
 
       setStage("submitting");
-      const txHash = await writeContractAsync({
+      const txHash = await writeContract({
         address: info.escrowAddress,
         abi: escrowAbi,
         functionName: "countersign",
@@ -202,18 +197,33 @@ function Inner({
 
       // Persist Party B's countersign to the off-chain index. State moves
       // Awaiting → Active here; partyBWallet now resolves on the dashboard.
-      await fetch(`/api/contracts/${info.escrowAddress}/countersign`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          partyB: {
-            wallet,
-            name: profile.name,
-            email: profile.email,
-            attestationHash: attestationStructHash,
-          },
-        }),
-      });
+      const countersignRes = await fetch(
+        `/api/contracts/${info.escrowAddress}/countersign`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            partyB: {
+              wallet,
+              name: profile.name,
+              email: profile.email,
+              attestationHash: attestationStructHash,
+            },
+          }),
+        },
+      );
+      if (!countersignRes.ok) {
+        let message = "Failed to save countersign";
+        try {
+          const payload = (await countersignRes.json()) as { error?: unknown };
+          if (typeof payload?.error === "string") {
+            message = payload.error;
+          }
+        } catch {
+          // Keep the generic fallback if the response isn't JSON.
+        }
+        throw new Error(message);
+      }
 
       // Stamp B's Quick Sign block onto the existing signed PDF (which
       // carries A's block) and re-pin. On-chain pdfHash is unchanged -

@@ -5,9 +5,7 @@ const id = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113);
 export const activeChain = id === 43114 ? avalanche : avalancheFuji;
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
-const FUJI_WAVAX = "0xd00ae08403b9bbb9124bb305c09058e32c39a48c";
 const FUJI_USDC = "0x5425890298aed601595a70ab815c96711a31bc65";
-const MAINNET_WAVAX = "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7";
 const MAINNET_USDC = "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e";
 
 const legacyTokenAddress = process.env.NEXT_PUBLIC_DEPOSIT_TOKEN as
@@ -37,18 +35,11 @@ export type DepositTokenConfig = {
 export const depositTokens: DepositTokenConfig[] = [
   {
     id: "dnzd",
-    label: "DNZD",
-    symbol: "DNZD",
-    address: configuredAddress(
-      process.env.NEXT_PUBLIC_DNZD_TOKEN ??
-        process.env.NEXT_PUBLIC_AVAX_TOKEN ??
-        (legacyTokenSymbol?.toUpperCase() === "DNZD"
-          ? legacyTokenAddress
-          : undefined),
-      activeChain.id === 43114 ? MAINNET_WAVAX : FUJI_WAVAX,
-    ),
+    label: "dNZD",
+    symbol: "dNZD",
+    address: configuredAddress(process.env.NEXT_PUBLIC_DNZD_TOKEN, ZERO),
     decimals: Number(process.env.NEXT_PUBLIC_DNZD_TOKEN_DECIMALS ?? 18),
-    helper: "Demo dNZD rail",
+    helper: "Fuji dNZD rail",
   },
   {
     id: "usdc",

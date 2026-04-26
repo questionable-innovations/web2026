@@ -31,7 +31,7 @@ export function EnsProfileCard({
         className="border-b border-rule px-5 py-3 font-mono uppercase text-muted"
         style={{ fontSize: 10, letterSpacing: 1.5 }}
       >
-        ENS profile · mainnet
+        ENS profile · sepolia
       </div>
       <div
         className="grid items-start gap-4 px-5 py-4"

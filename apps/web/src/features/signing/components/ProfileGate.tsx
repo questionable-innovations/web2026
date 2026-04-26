@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { EmailVerify } from "./EmailVerify";
+import { errorMessage, toastError } from "@/lib/error-toast";
 
 export type Profile = {
   wallet: `0x${string}`;
@@ -38,6 +39,7 @@ export function ProfileGate({
       })
       .catch((err: Error) => {
         if (!cancelled) {
+          toastError("Couldn't load your profile", err);
           setLoadError(err.message);
           setLoaded(true);
         }
@@ -104,8 +106,8 @@ function Onboarding({
       const { profile } = (await res.json()) as { profile: Profile };
       onSaved(profile);
     } catch (err) {
-      console.error("Profile save failed", err);
-      onError(err instanceof Error ? err.message : "save failed");
+      toastError("Couldn't save your profile", err);
+      onError(errorMessage(err));
       setSaving(false);
     }
   }

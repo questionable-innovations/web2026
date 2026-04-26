@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -12,7 +12,7 @@ type Props =
   | { file: File | Blob; escrowAddress?: never; signed?: never };
 
 export function PdfViewer(props: Props) {
-  const [url, setUrl] = useState<string>();
+  const [data, setData] = useState<Uint8Array>();
   const [error, setError] = useState<string | null>(null);
   const [pages, setPages] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -20,50 +20,55 @@ export function PdfViewer(props: Props) {
   const isRestoringRef = useRef(false);
 
   useEffect(() => {
-    let revoke: string | undefined;
+    let canceled = false;
     isRestoringRef.current = true; // Suspend saving scroll position while fetching/reloading
     setError(null);
-    setUrl(undefined);
+    setData(undefined);
     setPages(0);
-    
-    if (props.file) {
-      const blobUrl = URL.createObjectURL(props.file);
-      revoke = blobUrl;
-      setUrl(blobUrl);
-    } else if (props.escrowAddress) {
-      const qs = props.signed ? "?signed=1" : "";
-      fetch(`/api/contracts/${props.escrowAddress}/pdf${qs}`)
-        .then(async (r) => {
-          if (r.ok) return r.blob();
-          let message = "PDF could not be fetched.";
-          try {
-            const payload = (await r.json()) as { error?: unknown };
-            if (typeof payload.error === "string") message = payload.error;
-          } catch {
-            if (r.statusText) message = r.statusText;
+
+    const load = async () => {
+      try {
+        let buf: ArrayBuffer;
+        if (props.file) {
+          buf = await props.file.arrayBuffer();
+        } else if (props.escrowAddress) {
+          const qs = props.signed ? "?signed=1" : "";
+          const r = await fetch(`/api/contracts/${props.escrowAddress}/pdf${qs}`);
+          if (!r.ok) {
+            let message = "PDF could not be fetched.";
+            try {
+              const payload = (await r.json()) as { error?: unknown };
+              if (typeof payload.error === "string") message = payload.error;
+            } catch {
+              if (r.statusText) message = r.statusText;
+            }
+            throw new Error(message);
           }
-          throw new Error(message);
-        })
-        .then((b) => {
-          const blobUrl = URL.createObjectURL(b);
-          revoke = blobUrl;
-          setUrl(blobUrl);
-        })
-        .catch((err: Error) => {
-          setUrl(undefined);
-          setError(err.message);
-        });
-    }
+          buf = await r.arrayBuffer();
+        } else {
+          return;
+        }
+        if (!canceled) setData(new Uint8Array(buf));
+      } catch (err) {
+        if (!canceled) setError(err instanceof Error ? err.message : "Could not load PDF");
+      }
+    };
+    load();
+
     return () => {
-      if (revoke) URL.revokeObjectURL(revoke);
+      canceled = true;
     };
   }, [props.file, props.escrowAddress, props.signed]);
+
+  // react-pdf treats a new object on each render as a new file. Memoize the
+  // {data} prop so it only changes when the underlying bytes do.
+  const fileProp = useMemo(() => (data ? { data } : null), [data]);
 
   if (error) {
     return <p className="text-sm text-accent">Couldn&apos;t load PDF: {error}</p>;
   }
 
-  if (!url) {
+  if (!fileProp) {
     return <p className="text-sm text-zinc-500">Loading PDF…</p>;
   }
   return (
@@ -77,7 +82,7 @@ export function PdfViewer(props: Props) {
       }}
     >
       <Document
-        file={url}
+        file={fileProp}
         loading={null} // Prevent layout collapse to minimize scroll-jump
         onLoadError={(err) => {
           setError(err.message || "PDF renderer could not read this file.");

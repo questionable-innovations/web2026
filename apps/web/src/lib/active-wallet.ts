@@ -1,6 +1,7 @@
 "use client";
 
 import { useAccount, useSignTypedData, useWriteContract } from "wagmi";
+import { useWallets } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { encodeFunctionData, type Abi, type Hex } from "viem";
 
@@ -31,12 +32,18 @@ type WriteCall = {
 /// smart account, so this works end-to-end.
 export function useActiveWallet() {
   const eoa = useAccount();
+  const privyWallets = useSafeWallets();
   const smart = useSafeSmartWallets();
   const { writeContractAsync } = useWriteContract();
   const { signTypedDataAsync } = useSignTypedData();
 
   const smartClient = smart?.client;
-  const address = (smartClient?.account.address ?? eoa.address) as
+  const embeddedWallet = privyWallets?.wallets.find(
+    (wallet) => wallet.walletClientType === "privy" && wallet.address,
+  );
+  const address = (smartClient?.account.address ??
+    eoa.address ??
+    embeddedWallet?.address) as
     | `0x${string}`
     | undefined;
 
@@ -85,6 +92,14 @@ export function useActiveWallet() {
 function useSafeSmartWallets() {
   try {
     return useSmartWallets();
+  } catch {
+    return null;
+  }
+}
+
+function useSafeWallets() {
+  try {
+    return useWallets();
   } catch {
     return null;
   }

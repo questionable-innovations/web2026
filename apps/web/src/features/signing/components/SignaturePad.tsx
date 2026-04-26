@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SignatureCanvas from "react-signature-canvas";
 
 /// Drawn signature is captured for the audit certificate (§4.3 step 7); the
@@ -11,7 +11,42 @@ export function SignaturePad({
   onChange?: (dataUrl: string | null) => void;
 }) {
   const ref = useRef<SignatureCanvas | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [hasInk, setHasInk] = useState(false);
+
+  // Keep the canvas backing store in sync with its rendered size and DPR so
+  // pointer coordinates map to where the ink is drawn. Without this, retina
+  // touchpads draw with a visible offset from the cursor.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    const pad = ref.current;
+    if (!wrapper || !pad) return;
+
+    function resize() {
+      const canvas = pad?.getCanvas();
+      if (!canvas) return;
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const targetW = Math.round(canvas.offsetWidth * ratio);
+      const targetH = Math.round(canvas.offsetHeight * ratio);
+      if (canvas.width === targetW && canvas.height === targetH) return;
+      const data = pad?.toData();
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+      ctx?.scale(ratio, ratio);
+      pad?.clear();
+      if (data && data.length) pad?.fromData(data);
+    }
+
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(wrapper);
+    window.addEventListener("resize", resize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
 
   function handleEnd() {
     const pad = ref.current;
@@ -33,15 +68,17 @@ export function SignaturePad({
 
   return (
     <div className="space-y-2">
-      <div className="rounded-md border border-dashed border-[color:var(--color-border)] bg-white">
+      <div
+        ref={wrapperRef}
+        className="rounded-md border border-dashed border-[color:var(--color-border)] bg-white"
+      >
         <SignatureCanvas
           ref={ref}
           onEnd={handleEnd}
           penColor="#0a0a0a"
+          clearOnResize={false}
           canvasProps={{
-            className: "block w-full",
-            width: 480,
-            height: 140,
+            className: "block w-full h-[140px] touch-none",
           }}
         />
       </div>

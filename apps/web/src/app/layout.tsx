@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -38,6 +39,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body>
         <Providers>{children}</Providers>
+        <Toaster
+          position="bottom-right"
+          theme="light"
+          richColors
+          closeButton
+          toastOptions={{ duration: 8000 }}
+        />
       </body>
     </html>
   );

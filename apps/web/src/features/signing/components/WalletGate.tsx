@@ -1,12 +1,18 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { useConnect } from "wagmi";
 import type { Connector } from "wagmi";
-import { useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
+import {
+  useCreateWallet,
+  useLoginWithOAuth,
+  usePrivy,
+  useWallets,
+} from "@privy-io/react-auth";
 import { useActiveWallet } from "@/lib/active-wallet";
 import { isLocalhost } from "@/lib/isLocalhost";
+import { errorMessage, toastError } from "@/lib/error-toast";
 
 /// Gate for any flow that requires a connected wallet. Renders a sign-in
 /// surface if the user isn't connected, then hands the address down to the
@@ -32,6 +38,9 @@ export function WalletGate({
     : undefined;
   const privy = useSafePrivy();
   const loginWithOAuth = useSafeLoginWithOAuth();
+  const walletCreator = useSafeCreateWallet();
+  const privyWallets = useSafeWallets();
+  const walletCreationAttempted = useRef(false);
   // When Privy is mounted it owns the wagmi connection state. Calling
   // wagmi's connect() directly makes the wallet flash in and then get
   // torn down because Privy has no session for it. Route external wallet
@@ -40,12 +49,32 @@ export function WalletGate({
     typeof window !== "undefined" &&
     (window as { ethereum?: unknown }).ethereum !== undefined;
   const showRawErrors = isLocalhost();
+  const hasPrivy = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID && privy;
+
+  useEffect(() => {
+    if (!hasPrivy || !privy?.ready || !privy.authenticated) return;
+    if (!privyWallets?.ready || !walletCreator?.createWallet) return;
+
+    const hasEthereumWallet =
+      privyWallets.wallets.some(
+        (wallet) => wallet.walletClientType === "privy" && wallet.address,
+      ) || userHasLinkedEthereumWallet(privy.user);
+
+    if (hasEthereumWallet || walletCreationAttempted.current) return;
+
+    walletCreationAttempted.current = true;
+    void runEmbeddedLogin("privy-wallet-create", async () => {
+      await walletCreator.createWallet();
+    });
+  }, [hasPrivy, privy, privyWallets, walletCreator]);
+
+  useEffect(() => {
+    if (error) toastError("Wallet connect failed", error);
+  }, [error]);
 
   if (isConnected && address) {
     return <>{children(address)}</>;
   }
-
-  const hasPrivy = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID && privy;
 
   // Drop the privy connector - that's surfaced through the dedicated embedded
   // button, not as a generic wallet.
@@ -267,10 +296,8 @@ export function WalletGate({
     try {
       await action();
     } catch (err) {
-      console.error("Embedded wallet login failed", err);
-      setEmbeddedError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      toastError("Sign-in failed", err);
+      setEmbeddedError(errorMessage(err));
     } finally {
       setEmbeddedPendingKey(null);
     }
@@ -491,4 +518,42 @@ function useSafeLoginWithOAuth() {
     console.error("useLoginWithOAuth hook unavailable", err);
     return null;
   }
+}
+
+function useSafeCreateWallet() {
+  try {
+    return useCreateWallet();
+  } catch (err) {
+    console.error("useCreateWallet hook unavailable", err);
+    return null;
+  }
+}
+
+function useSafeWallets() {
+  try {
+    return useWallets();
+  } catch (err) {
+    console.error("useWallets hook unavailable", err);
+    return null;
+  }
+}
+
+function userHasLinkedEthereumWallet(user: unknown): boolean {
+  if (!user || typeof user !== "object") return false;
+  const linkedAccounts = (user as { linkedAccounts?: unknown }).linkedAccounts;
+  if (!Array.isArray(linkedAccounts)) return false;
+  return linkedAccounts.some((account) => {
+    if (!account || typeof account !== "object") return false;
+    const a = account as {
+      type?: unknown;
+      address?: unknown;
+      chain_type?: unknown;
+      walletClient?: unknown;
+    };
+    return (
+      a.type === "wallet" &&
+      typeof a.address === "string" &&
+      (a.chain_type === "ethereum" || a.walletClient === "privy")
+    );
+  });
 }

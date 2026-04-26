@@ -22,6 +22,7 @@ type ContractInfo = {
   escrowAddress: `0x${string}`;
   title: string;
   pdfHash: `0x${string}`;
+  signedPdfCid: string | null;
   partyAName: string | null;
   partyAWallet: `0x${string}`;
   counterpartyEmailMasked: string | null;
@@ -314,10 +315,15 @@ function BLanding({
             className="mb-3 flex justify-between font-mono uppercase text-muted"
             style={{ fontSize: 10, letterSpacing: 1 }}
           >
-            <span>{info.title} · preview</span>
+            <span>
+              {info.title} · {info.signedPdfCid ? "signed copy" : "preview"}
+            </span>
             <span>SHA256 · {info.pdfHash.slice(0, 6)}…{info.pdfHash.slice(-4)}</span>
           </div>
-          <PdfViewer escrowAddress={info.escrowAddress} />
+          <PdfViewer
+            escrowAddress={info.escrowAddress}
+            signed={Boolean(info.signedPdfCid)}
+          />
         </div>
       </div>
     </div>

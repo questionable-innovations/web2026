@@ -10,13 +10,14 @@ import {
   Flag,
 } from "lucide-react";
 import { usePublicClient } from "wagmi";
+import { formatUnits } from "viem";
 import { useActiveWallet } from "@/lib/active-wallet";
 import { StateBadge } from "@/components/AppShell";
 import { WalletGate } from "@/features/signing/components/WalletGate";
 import { ChainGate } from "@/features/signing/components/ChainGate";
 import { PdfViewer } from "@/features/signing/components/PdfViewer";
 import { escrowAbi } from "@/lib/contracts/abis";
-import { activeChain, depositToken } from "@/lib/chain";
+import { activeChain, getDepositTokenByAddress } from "@/lib/chain";
 
 type ReleaseStatus = {
   escrowAddress: `0x${string}`;
@@ -264,6 +265,22 @@ function Inner({
     );
   }
 
+  const tokenConfig = getDepositTokenByAddress(status.depositToken);
+  // status.amount is the raw on-chain bigint (base units). Format against the
+  // token's own decimals — a USDC escrow's amount is 1e6× the user-facing
+  // value, so rendering the raw string would show six extra zeroes.
+  const amountDisplay = (() => {
+    try {
+      return formatUnits(BigInt(status.amount), tokenConfig.decimals);
+    } catch {
+      return status.amount;
+    }
+  })();
+  const amountNumeric = Number(amountDisplay);
+  const amountLabel = Number.isFinite(amountNumeric)
+    ? amountNumeric.toLocaleString()
+    : amountDisplay;
+
   const proposer = status.proposedReleaseBy?.toLowerCase() ?? null;
   const proposedByA = Boolean(
     proposer && proposer === status.partyA.wallet.toLowerCase(),
@@ -395,7 +412,7 @@ function Inner({
               ) : null}
               {canWithdraw ? (
                 <ActionButton
-                  label={`Withdraw $${status.amount}`}
+                  label={`Withdraw $${amountLabel}`}
                   primary
                   pending={stage === "withdrawing"}
                   onClick={onWithdraw}
@@ -509,10 +526,10 @@ function Inner({
                   className="mt-1 font-serif"
                   style={{ fontSize: 32, lineHeight: 1 }}
                 >
-                  ${Number(status.amount).toLocaleString()}
+                  ${amountLabel}
                   <span style={{ fontSize: 14, opacity: 0.6 }}>
                     {" "}
-                    {depositToken.symbol}
+                    {tokenConfig.symbol}
                   </span>
                 </div>
                 <div
@@ -644,7 +661,7 @@ function Inner({
               </div>
               <div>
                 <span className="text-ink">Subj</span> &nbsp;Release $
-                {status.amount} for {status.title}?
+                {amountLabel} for {status.title}?
               </div>
             </div>
             <div className="py-4">
@@ -659,7 +676,7 @@ function Inner({
                 style={{ fontSize: 14 }}
               >
                 {status.partyA.name ?? "Party A"} has marked the contract
-                complete and proposed release of the ${status.amount} you
+                complete and proposed release of the ${amountLabel} you
                 placed in escrow.
                 <br />
                 <br />

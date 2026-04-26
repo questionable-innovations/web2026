@@ -1,4 +1,9 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import logoIcon from "@/app/logodealsealicononly.png";
+
+type StaticImageAsset = {
+  src?: string;
+};
 
 export type SignatureBlock = {
   role: "Party A" | "Party B";
@@ -24,6 +29,7 @@ export async function appendSignatureCertificate(
   const helvBold = await doc.embedFont(StandardFonts.HelveticaBold);
   const serif = await doc.embedFont(StandardFonts.TimesRoman);
   const mono = await doc.embedFont(StandardFonts.Courier);
+  const logo = await loadBundledLogo(doc);
 
   const page = doc.addPage([595.28, 841.89]); // A4 portrait, points
   const { width, height } = page.getSize();
@@ -46,15 +52,25 @@ export async function appendSignatureCertificate(
     color: paper,
   });
 
+  if (logo) {
+    drawLogo(page, logo, {
+      x: margin,
+      y: y - 52,
+      maxW: 42,
+      maxH: 42,
+    });
+  }
+
+  const headerTextX = logo ? margin + 56 : margin;
   page.drawText("Quick Sign certificate", {
-    x: margin,
+    x: headerTextX,
     y,
     size: 10,
     font: mono,
     color: accent,
   });
   page.drawText("DealSeal", {
-    x: margin,
+    x: headerTextX,
     y: y - 42,
     size: 38,
     font: serif,
@@ -340,6 +356,38 @@ async function embedAndDraw(
     y: rect.y + (rect.h - drawH) / 2,
     width: drawW,
     height: drawH,
+  });
+}
+
+async function loadBundledLogo(
+  doc: PDFDocument,
+): Promise<import("pdf-lib").PDFImage | null> {
+  const src = (logoIcon as StaticImageAsset).src;
+  if (!src || typeof fetch !== "function") return null;
+
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return doc.embedPng(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function drawLogo(
+  page: import("pdf-lib").PDFPage,
+  logo: import("pdf-lib").PDFImage,
+  rect: { x: number; y: number; maxW: number; maxH: number },
+) {
+  const scale = Math.min(rect.maxW / logo.width, rect.maxH / logo.height);
+  const width = logo.width * scale;
+  const height = logo.height * scale;
+  page.drawImage(logo, {
+    x: rect.x + (rect.maxW - width) / 2,
+    y: rect.y + (rect.maxH - height) / 2,
+    width,
+    height,
   });
 }
 

@@ -51,6 +51,7 @@ import { PdfThumb, StateBadge } from "@/components/AppShell";
 /// the sender pressing "share" to countersign; if they miss it, partyA
 /// re-issues a link.
 const LINK_VALIDITY_SECONDS = 7 * 86_400;
+const DEPOSIT_PERCENT_STEP = 5;
 
 type Stage =
   | "details"
@@ -412,6 +413,8 @@ function DetailsStep({
   const amountValid = isPositiveDecimalInput(amount);
   const totalDueValid = isPositiveDecimalInput(totalDue);
   const percentValid = depositPercent > 0 && depositPercent <= 100;
+  const sliderPercent =
+    Math.round(depositPercent / DEPOSIT_PERCENT_STEP) * DEPOSIT_PERCENT_STEP;
   const depositWithinTotal =
     !amountValid ||
     !totalDueValid ||
@@ -454,6 +457,21 @@ function DetailsStep({
     const d = new Date(Date.now() + safeDays * 86400_000);
     return d.toISOString().slice(0, 10);
   }, [days]);
+
+  function updateDepositFromPercent(nextPercent: number) {
+    const clamped = Math.min(100, Math.max(0, nextPercent));
+    setDepositPercent(clamped);
+    setAmount(
+      percentOfDecimalInput(totalDue, clamped, selectedToken.decimals),
+    );
+  }
+
+  function updateDepositFromAmount(nextAmount: string) {
+    setAmount(nextAmount);
+    if (isPositiveDecimalInput(nextAmount) && totalDueValid) {
+      setDepositPercent(percentFromDecimalInputs(nextAmount, totalDue));
+    }
+  }
 
   return (
     <form
@@ -631,34 +649,86 @@ function DetailsStep({
             className="bg-paper px-4 py-3.5"
             style={{ border: "1px solid var(--color-accent)" }}
           >
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-mono text-muted" style={{ fontSize: 12 }}>
-                {depositPercent}%
-              </span>
-              <span
-                className="font-mono uppercase text-muted"
-                style={{ fontSize: 10, letterSpacing: 1 }}
-              >
-                = {amount || "-"} {selectedToken.symbol}
-              </span>
+            <div className="grid grid-cols-2 gap-3">
+              <label>
+                <span
+                  className="mb-1 block font-mono uppercase text-muted"
+                  style={{ fontSize: 10, letterSpacing: 1 }}
+                >
+                  Percent
+                </span>
+                <div
+                  className="flex items-center gap-2 border border-rule bg-card px-3 py-2"
+                >
+                  <input
+                    inputMode="numeric"
+                    value={depositPercent}
+                    onChange={(e) => {
+                      setFormError(null);
+                      const nextPercent = Number(
+                        e.target.value.replace(/\D/g, "") || "0",
+                      );
+                      updateDepositFromPercent(nextPercent);
+                    }}
+                    aria-invalid={!percentValid}
+                    className="min-w-0 flex-1 bg-transparent text-right font-mono outline-none"
+                    style={{ fontSize: 14 }}
+                  />
+                  <span className="font-mono text-muted" style={{ fontSize: 12 }}>
+                    %
+                  </span>
+                </div>
+              </label>
+              <label>
+                <span
+                  className="mb-1 block font-mono uppercase text-muted"
+                  style={{ fontSize: 10, letterSpacing: 1 }}
+                >
+                  Deposit $
+                </span>
+                <div
+                  className="flex items-center gap-2 border border-rule bg-card px-3 py-2"
+                >
+                  <span className="font-mono text-muted" style={{ fontSize: 12 }}>
+                    NZD
+                  </span>
+                  <input
+                    required
+                    inputMode="decimal"
+                    onKeyDown={blockNonDecimalKey}
+                    value={amount}
+                    onChange={(e) => {
+                      setFormError(null);
+                      updateDepositFromAmount(
+                        sanitizeDecimalInput(
+                          e.target.value,
+                          selectedToken.decimals,
+                        ),
+                      );
+                    }}
+                    aria-invalid={Boolean(
+                      amount && (!amountValid || !depositWithinTotal),
+                    )}
+                    placeholder="4,800.00"
+                    className="min-w-0 flex-1 bg-transparent text-right font-mono outline-none"
+                    style={{ fontSize: 14 }}
+                  />
+                </div>
+              </label>
             </div>
             <input
               type="range"
               min="0"
               max="100"
-              step="1"
-              value={depositPercent}
+              step={DEPOSIT_PERCENT_STEP}
+              value={sliderPercent}
               disabled={!totalDueValid}
               onChange={(e) => {
                 setFormError(null);
                 const nextPercent = Number(e.target.value);
-                setDepositPercent(nextPercent);
-                setAmount(
-                  percentOfDecimalInput(
-                    totalDue,
-                    nextPercent,
-                    selectedToken.decimals,
-                  ),
+                updateDepositFromPercent(
+                  Math.round(nextPercent / DEPOSIT_PERCENT_STEP) *
+                    DEPOSIT_PERCENT_STEP,
                 );
               }}
               aria-invalid={Boolean(

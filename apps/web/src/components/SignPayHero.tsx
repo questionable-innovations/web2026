@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import logoIcon from "@/app/logodealsealicononly.png";
 
 const DURATION = 6500;
 const SIG_LEN = 380;
@@ -193,7 +195,13 @@ export function SignPayHero() {
           opacity: tokenOpacity,
         }}
       >
-        <svg width="180" height="180" viewBox="-90 -90 180 180">
+        <div style={{ position: "relative", width: 180, height: 180 }}>
+          <svg
+            width="180"
+            height="180"
+            viewBox="-90 -90 180 180"
+            style={{ position: "absolute", inset: 0 }}
+          >
           <circle r="78" fill="none" stroke={ink} strokeWidth="1" opacity="0.2" />
           <circle r="62" fill={accent} />
           <circle r="62" fill="none" stroke={ink} strokeOpacity="0.2" strokeWidth="1" />
@@ -216,25 +224,26 @@ export function SignPayHero() {
               />
             );
           })}
-          <text
-            x="0"
-            y="2"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#fff"
-            fontFamily="var(--font-serif)"
-            fontSize="48"
-            fontStyle="italic"
-          >
-            DS
-          </text>
           <path id="hero-arc" d="M -50 30 A 50 50 0 0 0 50 30" fill="none" />
           <text fontFamily="var(--font-mono)" fontSize="7" fill="#fff" letterSpacing="2">
             <textPath href="#hero-arc" startOffset="50%" textAnchor="middle">
               SIGNED · SEALED
             </textPath>
           </text>
-        </svg>
+          </svg>
+          <Image
+            src={logoIcon}
+            alt="DealSeal logo"
+            width={84}
+            height={84}
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -56%)",
+            }}
+          />
+        </div>
       </div>
 
       <div

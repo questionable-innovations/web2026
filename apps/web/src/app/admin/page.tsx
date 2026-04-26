@@ -53,6 +53,12 @@ export default async function AdminPage() {
             contracts={serializedContracts}
             loadError={loadError}
           />
+
+          <p className="mt-8 border-t border-rule pt-5 text-xs leading-5 text-muted">
+            Demo note: this admin overview is open for demo purposes. In a
+            production deployment it would usually require login and role-based
+            admin access.
+          </p>
         </div>
       </div>
     </div>

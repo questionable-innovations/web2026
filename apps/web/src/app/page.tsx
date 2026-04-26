@@ -50,6 +50,13 @@ function TopBar() {
       </nav>
       <div className="flex items-center gap-3">
         <Link
+          href="/admin"
+          className="border border-ink px-4 py-2.5 text-[13px]"
+          style={{ letterSpacing: 0.3 }}
+        >
+          Admin demo
+        </Link>
+        <Link
           href="/new"
           className="inline-flex items-center gap-2 bg-ink px-4 py-2.5 text-[13px] text-paper"
           style={{ letterSpacing: 0.3 }}

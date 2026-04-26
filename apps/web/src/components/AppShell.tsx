@@ -45,7 +45,6 @@ export function AppNav({
       label: "Reputation",
       href: wallet ? `/b/${wallet}` : "/b",
     },
-    { k: "admin", label: "Admin", href: "/admin" },
   ];
   return (
     <header className="flex items-center justify-between border-b border-rule bg-paper px-7 py-3.5">

@@ -1,6 +1,7 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
+import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 import { WagmiProvider as PrivyWagmiProvider } from "@privy-io/wagmi";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -32,9 +33,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
         embeddedWallets: { createOnLogin: "users-without-wallets" },
       }}
     >
-      <QueryClientProvider client={queryClient}>
-        <PrivyWagmiProvider config={wagmiConfig}>{children}</PrivyWagmiProvider>
-      </QueryClientProvider>
+      <SmartWalletsProvider>
+        <QueryClientProvider client={queryClient}>
+          <PrivyWagmiProvider config={wagmiConfig}>
+            {children}
+          </PrivyWagmiProvider>
+        </QueryClientProvider>
+      </SmartWalletsProvider>
     </PrivyProvider>
   );
 }

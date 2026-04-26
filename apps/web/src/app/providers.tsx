@@ -5,7 +5,7 @@ import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 import { WagmiProvider as PrivyWagmiProvider } from "@privy-io/wagmi";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { wagmiConfig } from "@/lib/wagmi";
+import { wagmiConfig, privyWagmiConfig } from "@/lib/wagmi";
 import { activeChain } from "@/lib/chain";
 
 const queryClient = new QueryClient();
@@ -35,7 +35,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <SmartWalletsProvider>
         <QueryClientProvider client={queryClient}>
-          <PrivyWagmiProvider config={wagmiConfig}>
+          <PrivyWagmiProvider config={privyWagmiConfig}>
             {children}
           </PrivyWagmiProvider>
         </QueryClientProvider>

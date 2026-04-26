@@ -2,13 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { ArrowRight, Check, CornerDownRight } from "lucide-react";
-import {
-  usePublicClient,
-  useReadContract,
-  useSignTypedData,
-  useWriteContract,
-} from "wagmi";
+import { usePublicClient, useReadContract } from "wagmi";
 import { formatUnits } from "viem";
+import { useActiveWallet } from "@/lib/active-wallet";
 import {
   buildAttestation,
   eip712Domain,
@@ -87,8 +83,7 @@ function Inner({
   const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
   const publicClient = usePublicClient();
-  const { signTypedDataAsync } = useSignTypedData();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContract, signTypedData } = useActiveWallet();
 
   const [confirm, setConfirm] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
@@ -157,7 +152,7 @@ function Inner({
         (allowance as bigint) < amt
       ) {
         setStage("approving");
-        const approveHash = await writeContractAsync({
+        const approveHash = await writeContract({
           address: info.depositToken,
           abi: erc20Abi,
           functionName: "approve",
@@ -177,7 +172,7 @@ function Inner({
         emailSalt,
         pdfHash: info.pdfHash,
       });
-      const signature = await signTypedDataAsync({
+      const signature = await signTypedData({
         domain: eip712Domain(chainId, info.escrowAddress),
         types: eip712Types,
         primaryType: "Attestation",
@@ -185,7 +180,7 @@ function Inner({
       });
 
       setStage("submitting");
-      const txHash = await writeContractAsync({
+      const txHash = await writeContract({
         address: info.escrowAddress,
         abi: escrowAbi,
         functionName: "countersign",

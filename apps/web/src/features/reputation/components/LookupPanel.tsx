@@ -183,12 +183,12 @@ export function LookupPanel() {
 
       {preview.kind === "loading" && (
         <div className="mb-10 border border-rule bg-card px-5 py-4 font-mono text-muted" style={{ fontSize: 12 }}>
-          Resolving {preview.query} on mainnet…
+          Resolving {preview.query} on sepolia…
         </div>
       )}
       {preview.kind === "miss" && (
         <div className="mb-10 border border-rule bg-card px-5 py-4 font-mono text-muted" style={{ fontSize: 12 }}>
-          {preview.query} doesn&apos;t resolve to an address on mainnet ENS.
+          {preview.query} doesn&apos;t resolve to an address on sepolia ENS.
         </div>
       )}
       {preview.kind === "hit" && (

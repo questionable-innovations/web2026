@@ -9,13 +9,9 @@ import {
   Check,
   CornerDownRight,
 } from "lucide-react";
-import {
-  useAccount,
-  usePublicClient,
-  useSignTypedData,
-  useWriteContract,
-} from "wagmi";
+import { usePublicClient } from "wagmi";
 import { parseUnits } from "viem";
+import { useActiveWallet } from "@/lib/active-wallet";
 import { sha256 } from "@/lib/ipfs";
 import { newSecret, secretHash, shareLink } from "@/lib/share-link";
 import {
@@ -637,8 +633,7 @@ function SignStep({
   const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
   const publicClient = usePublicClient();
-  const { signTypedDataAsync } = useSignTypedData();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContract, signTypedData } = useActiveWallet();
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [stampedFile, setStampedFile] = useState<File | null>(null);
 
@@ -771,7 +766,7 @@ function SignStep({
                 emailSalt,
                 pdfHash,
               });
-              const signature = await signTypedDataAsync({
+              const signature = await signTypedData({
                 domain: eip712Domain(chainId, predicted),
                 types: eip712Types,
                 primaryType: "Attestation",
@@ -795,7 +790,7 @@ function SignStep({
               })) as number;
               const amountWei = parseUnits(details.amount, decimals);
 
-              const txHash = await writeContractAsync({
+              const txHash = await writeContract({
                 address: escrowFactoryAddress,
                 abi: escrowFactoryAbi,
                 functionName: "createEscrowDeterministic",
@@ -934,7 +929,7 @@ function SignStep({
 /// Used inside the dashboard summary; pulls wallet from context so we can
 /// render outside of an explicit prop.
 export function useConnectedAccount() {
-  const { address } = useAccount();
+  const { address } = useActiveWallet();
   return address;
 }
 

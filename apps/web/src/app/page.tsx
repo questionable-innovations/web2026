@@ -56,7 +56,6 @@ function TopBar() {
         <a href="#how-it-works">How it works</a>
         <a href="#flow">For contractors</a>
         <a href="#reputation">Reputation</a>
-        <Link href="/graph">Graph</Link>
         <a href="#trust">Legal &amp; security</a>
       </nav>
       <div className="flex items-center gap-3">

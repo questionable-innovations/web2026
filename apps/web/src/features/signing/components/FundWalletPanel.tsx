@@ -64,7 +64,7 @@ export function FundWalletPanel({
   }
 
   return (
-    <div className="border border-accent bg-ink-card p-5">
+    <div className="border border-accent bg-card p-5">
       <div className="flex items-baseline justify-between">
         <div
           className="inline-flex items-center gap-1.5 font-mono uppercase text-accent"
@@ -74,7 +74,7 @@ export function FundWalletPanel({
           Top up to deposit
         </div>
         <span
-          className="font-mono uppercase text-ink-muted"
+          className="font-mono uppercase text-muted"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
           {activeChain.name}
@@ -82,13 +82,13 @@ export function FundWalletPanel({
       </div>
 
       <div
-        className="mt-2 font-serif text-paper"
+        className="mt-2 font-serif text-ink"
         style={{ fontSize: 26, lineHeight: 1.15, letterSpacing: -0.4 }}
       >
         Send {formatUnits(gap, decimals)} {symbol} to your wallet.
       </div>
       <p
-        className="mt-1.5 font-mono text-ink-soft"
+        className="mt-1.5 font-mono text-ink/70"
         style={{ fontSize: 11, lineHeight: 1.6 }}
       >
         Balance {formatUnits(have, decimals)} {symbol} · need{" "}
@@ -122,9 +122,9 @@ export function FundWalletPanel({
         <MainnetFunding symbol={symbol} />
       )}
 
-      <div className="mt-4 flex items-center justify-between border-t border-ink-rule-soft pt-3">
+      <div className="mt-4 flex items-center justify-between border-t border-rule pt-3">
         <span
-          className="font-mono text-ink-muted"
+          className="font-mono text-muted"
           style={{ fontSize: 10 }}
         >
           Once funds arrive, hit refresh; the deposit button unlocks.
@@ -133,7 +133,7 @@ export function FundWalletPanel({
           type="button"
           onClick={refresh}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 border border-ink-rule px-3.5 py-2 font-mono uppercase text-paper transition-colors hover:bg-ink-rule-soft disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 border border-rule px-3.5 py-2 font-mono uppercase text-ink transition-colors hover:border-accent hover:bg-accent-soft disabled:opacity-60"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
           {refreshing ? (
@@ -166,10 +166,10 @@ function FundRow({
   hint?: string;
 }) {
   return (
-    <div className="border border-ink-rule px-3 py-2.5">
+    <div className="border border-rule px-3 py-2.5">
       <div className="flex items-baseline justify-between">
         <span
-          className="font-mono uppercase text-ink-muted"
+          className="font-mono uppercase text-muted"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
           {label}
@@ -191,7 +191,7 @@ function FundRow({
         </button>
       </div>
       <code
-        className="mt-1 block break-all font-mono text-paper"
+        className="mt-1 block break-all font-mono text-ink"
         style={{ fontSize: 11, lineHeight: 1.4 }}
         title={copyValue}
       >
@@ -199,7 +199,7 @@ function FundRow({
       </code>
       {hint && (
         <div
-          className="mt-1 font-mono text-ink-muted"
+          className="mt-1 font-mono text-muted"
           style={{ fontSize: 10 }}
         >
           {hint}
@@ -263,17 +263,17 @@ function FundLink({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="group flex items-center justify-between border border-ink-rule px-3.5 py-3 transition-colors hover:border-accent hover:bg-ink-rule-soft"
+      className="group flex items-center justify-between border border-rule px-3.5 py-3 transition-colors hover:border-accent hover:bg-accent-soft"
     >
       <span>
         <span
-          className="block text-paper"
+          className="block text-ink"
           style={{ fontSize: 13, fontWeight: 500 }}
         >
           {title}
         </span>
         <span
-          className="mt-0.5 block font-mono text-ink-muted"
+          className="mt-0.5 block font-mono text-muted"
           style={{ fontSize: 10 }}
         >
           {subtitle}

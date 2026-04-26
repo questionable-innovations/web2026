@@ -39,8 +39,7 @@ type Stage = "idle" | "approving" | "signing" | "submitting" | "error";
 /// The actual sign+deposit form. Assumes wallet/profile/chain gates have
 /// already passed - callers must wrap this in WalletGate + ProfileGate +
 /// ChainGate (or otherwise satisfy those preconditions) before rendering.
-/// Designed to be rendered against a dark (bg-ink) surface; uses the
-/// ink-card / ink-rule palette throughout.
+/// Designed to sit on the app's standard light paper/card surface.
 export function SignAndPayForm({
   info,
   secret,
@@ -294,9 +293,9 @@ export function SignAndPayForm({
 
   return (
     <div className="space-y-5">
-      <div className="border border-ink-rule bg-ink-card p-5">
+      <div className="border border-rule bg-card p-5">
         <div
-          className="mb-3.5 flex items-baseline justify-between font-mono uppercase text-ink-muted"
+          className="mb-3.5 flex items-baseline justify-between font-mono uppercase text-muted"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
           <span>You will deposit</span>
@@ -310,13 +309,13 @@ export function SignAndPayForm({
         </div>
         <div className="font-serif" style={{ fontSize: 56, lineHeight: 1 }}>
           ${Number(info.depositAmount).toLocaleString()}
-          <span className="text-ink-muted" style={{ fontSize: 18 }}>
+          <span className="text-muted" style={{ fontSize: 18 }}>
             {" "}
             NZD
           </span>
         </div>
         <div
-          className="mt-1.5 font-mono text-ink-soft"
+          className="mt-1.5 font-mono text-ink/70"
           style={{ fontSize: 11 }}
         >
           = {depositLabel} · into escrow{" "}
@@ -325,18 +324,18 @@ export function SignAndPayForm({
 
         <div className="mt-5">
           <div
-            className="mb-1.5 font-mono uppercase text-ink-muted"
+            className="mb-1.5 font-mono uppercase text-muted"
             style={{ fontSize: 10, letterSpacing: 1 }}
           >
             Type the amount to confirm
           </div>
           <div
-            className="flex items-center gap-2.5 px-3.5 py-3 font-mono text-paper"
+            className="flex items-center gap-2.5 px-3.5 py-3 font-mono text-ink"
             style={{
-              background: "var(--color-ink)",
+              background: "var(--color-paper)",
               border: `1px solid ${
                 confirm.length === 0
-                  ? "var(--color-ink-rule)"
+                  ? "var(--color-rule)"
                   : "var(--color-accent)"
               }`,
               fontSize: 14,
@@ -352,9 +351,9 @@ export function SignAndPayForm({
                 )
               }
               placeholder={exactAmount}
-              className="flex-1 bg-transparent text-paper outline-none placeholder:text-ink-faint"
+              className="flex-1 bg-transparent text-ink outline-none placeholder:text-muted"
             />
-            <span className="inline-flex items-center gap-1 text-ink-muted" style={{ fontSize: 11 }}>
+            <span className="inline-flex items-center gap-1 text-muted" style={{ fontSize: 11 }}>
               {confirmMatches ? (
                 <>
                   matches
@@ -368,9 +367,9 @@ export function SignAndPayForm({
         </div>
       </div>
 
-      <div className="border border-ink-rule bg-ink-card p-4">
+      <div className="border border-rule bg-card p-4">
         <div
-          className="mb-2 flex items-baseline justify-between font-mono uppercase text-ink-muted"
+          className="mb-2 flex items-baseline justify-between font-mono uppercase text-muted"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
           <span>Signing as</span>
@@ -378,11 +377,11 @@ export function SignAndPayForm({
             EDIT
           </a>
         </div>
-        <div className="text-paper" style={{ fontSize: 14 }}>
+        <div className="text-ink" style={{ fontSize: 14 }}>
           {profile.name}
         </div>
         <div
-          className="mt-0.5 font-mono text-ink-soft"
+          className="mt-0.5 font-mono text-ink/70"
           style={{ fontSize: 11 }}
         >
           {profile.email} · verified
@@ -391,7 +390,7 @@ export function SignAndPayForm({
 
       <div>
         <div
-          className="mb-2 font-mono uppercase text-ink-muted"
+          className="mb-2 font-mono uppercase text-muted"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
           Your signature
@@ -401,15 +400,15 @@ export function SignAndPayForm({
         </div>
       </div>
 
-      <div className="border border-ink-rule bg-ink-card p-4.5">
+      <div className="border border-rule bg-card p-4.5">
         <div
-          className="mb-2.5 font-mono uppercase text-ink-muted"
+          className="mb-2.5 font-mono uppercase text-muted"
           style={{ fontSize: 10, letterSpacing: 1 }}
         >
           You will sign over
         </div>
         <div
-          className="font-mono text-ink-soft"
+          className="font-mono text-ink/70"
           style={{ fontSize: 11, lineHeight: 1.8 }}
         >
           <KV
@@ -471,7 +470,7 @@ export function SignAndPayForm({
         </p>
       )}
       <p
-        className="font-mono text-ink-muted"
+        className="font-mono text-muted"
         style={{ fontSize: 10, lineHeight: 1.5 }}
       >
         <CornerDownRight size={11} className="inline-block mr-1 align-text-bottom" />
@@ -484,7 +483,7 @@ export function SignAndPayForm({
 function KV({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
   return (
     <div className="flex justify-between">
-      <span className="text-ink-soft">{k}</span>
+      <span className="text-muted">{k}</span>
       <span className={accent ? "text-accent" : undefined}>{v}</span>
     </div>
   );

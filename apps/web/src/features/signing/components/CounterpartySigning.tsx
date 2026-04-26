@@ -360,10 +360,9 @@ function BSignPay({
   secret: `0x${string}`;
   onDone: () => void;
 }) {
-  // The wallet sign-in / profile / chain gates render light-mode UIs (bg-card
-  // on bg-paper). Only flip to the dark sign+deposit canvas once all three
-  // gates have passed - otherwise the gate cards sit on a black page and look
-  // broken.
+  // The wallet sign-in / profile / chain gates render light-mode UIs. Keep the
+  // final sign+deposit step on the same paper/card palette so the payer flow
+  // stays visually continuous with the rest of the app.
   return (
     <Frame>
       <WalletGate
@@ -383,7 +382,7 @@ function BSignPay({
             >
               {(profile) => (
                 <ChainGate>
-                  <BSignPayDark info={info}>
+                  <BSignPayLight info={info}>
                     <SignAndPayForm
                       info={info}
                       secret={secret}
@@ -391,7 +390,7 @@ function BSignPay({
                       profile={profile}
                       onDone={onDone}
                     />
-                  </BSignPayDark>
+                  </BSignPayLight>
                 </ChainGate>
               )}
             </ProfileGate>
@@ -402,11 +401,10 @@ function BSignPay({
   );
 }
 
-/// Dark-canvas layout for the actual sign+deposit step. Rendered as a fixed
-/// overlay so it covers the light Frame the gates were sitting in - the
-/// gates' render-prop nesting otherwise leaves us nested inside that light
-/// container.
-function BSignPayDark({
+/// Light-canvas layout for the actual sign+deposit step. Rendered as a fixed
+/// overlay so it covers the Frame the gates were sitting in - the gates'
+/// render-prop nesting otherwise leaves us nested inside that container.
+function BSignPayLight({
   info,
   children,
 }: {
@@ -414,33 +412,33 @@ function BSignPayDark({
   children: ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-10 overflow-y-auto bg-ink text-paper">
-      <div className="flex items-center justify-between border-b border-ink-rule-soft px-8 py-5">
+    <div className="fixed inset-0 z-10 overflow-y-auto bg-paper text-ink">
+      <div className="flex items-center justify-between border-b border-rule px-8 py-5">
         <span
-          className="font-serif text-paper"
+          className="font-serif text-ink"
           style={{ fontSize: 22, letterSpacing: -0.4 }}
         >
           DealSeal
         </span>
         <div
-          className="flex gap-6 font-mono text-ink-muted"
+          className="flex gap-6 font-mono text-muted"
           style={{ fontSize: 11 }}
         >
-          <span className="inline-flex items-center gap-1.5 text-ink-faint">
+          <span className="inline-flex items-center gap-1.5 text-muted">
             <span>1</span>
             REVIEW
             <Check size={12} strokeWidth={2.5} />
           </span>
-          <span className="text-paper">
+          <span className="text-accent">
             <span className="mr-1.5">2</span>
             SIGN &amp; PAY
           </span>
-          <span className="text-ink-faint">
+          <span className="text-muted">
             <span className="mr-1.5">3</span>
             DONE
           </span>
         </div>
-        <span className="font-mono text-ink-muted" style={{ fontSize: 11 }}>
+        <span className="font-mono text-muted" style={{ fontSize: 11 }}>
           escrow {info.escrowAddress.slice(0, 6)}…{info.escrowAddress.slice(-4)}
         </span>
       </div>
@@ -466,7 +464,7 @@ function BSignPayDark({
               <em className="text-accent not-italic">and</em> place the deposit.
             </h1>
             <p
-              className="max-w-md leading-relaxed text-ink-soft"
+              className="max-w-md leading-relaxed text-ink/70"
               style={{ fontSize: 15 }}
             >
               Both halves commit atomically. If the deposit fails, the

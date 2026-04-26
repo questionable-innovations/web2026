@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 import { ArrowRight, CornerDownRight } from "lucide-react";
+import logoIcon from "@/app/logodealsealicononly.png";
 import { SignPayHero } from "@/components/SignPayHero";
 import { StateMachine } from "@/components/StateMachine";
 import { activeChain, depositToken } from "@/lib/chain";
@@ -28,7 +30,14 @@ function TopBar() {
     <header
       className={`flex items-center justify-between border-b border-rule py-6 ${SECTION_PAD}`}
     >
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-center gap-2.5">
+        <Image
+          src={logoIcon}
+          alt="DealSeal logo"
+          width={28}
+          height={28}
+          className="shrink-0"
+        />
         <span
           className="font-serif"
           style={{ fontSize: 26, lineHeight: 1, letterSpacing: -0.5 }}

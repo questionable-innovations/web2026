@@ -291,7 +291,7 @@ export function AdminContractsTable({
             icon={<CircleDollarSign size={18} />}
             label="Currently funded"
             value={formatAggregate(fundedRows)}
-            detail="Active, releasing, released, disputed"
+            detail="Active, released, disputed"
           />
           <MetricCard
             icon={<ShieldCheck size={18} />}

@@ -474,8 +474,7 @@ export function SignAndPayForm({
         style={{ fontSize: 10, lineHeight: 1.5 }}
       >
         <CornerDownRight size={11} className="inline-block mr-1 align-text-bottom" />
-        Funds release only when both you and{" "}
-        {info.partyAName ?? "Party A"} approve. We never custody them.
+        Either side can release the deposit to the other. We never custody them.
       </p>
     </div>
   );

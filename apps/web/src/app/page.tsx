@@ -204,8 +204,8 @@ function KnowYoureBeingPaid() {
     },
     {
       q: "Can they pull the deposit back?",
-      a: "No. Only the depositor releases; only the recipient refunds.",
-      d: "Each escrow clone has no admin key and no upgrade path. The depositor (Party B) releases the funds to Party A when the work's done; Party A can refund back to Party B if the deal falls through. Neither side can pay themselves.",
+      a: "No. Each side can only release funds to the other side.",
+      d: "Each escrow clone has no admin key and no upgrade path. Party B can release funds to Party A when the work's done; Party A can release them back to Party B if the deal falls through. Neither side can pay themselves.",
       meta: "immutable clone · symmetric release",
     },
   ];
@@ -383,7 +383,7 @@ function HowItWorks() {
     {
       n: "03",
       t: "They sign + pay, atomic",
-      d: `One transaction calls countersign() and transfers ${depositToken.symbol} into escrow. Later, release still requires one signer to propose and the other to approve.`,
+      d: `One transaction calls countersign() and transfers ${depositToken.symbol} into escrow. Later, either signer can release the deposit to the other side; neither can pull funds to themselves.`,
     },
   ];
   return (

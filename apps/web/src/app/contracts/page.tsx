@@ -56,10 +56,17 @@ function Inner({ wallet }: { wallet: `0x${string}` }) {
 
   const total = rows.length;
   const active = rows.filter((r) => r.state === "Active").length;
-  const completed = rows.filter((r) => r.state === "Released").length;
+  const completed = rows.filter(
+    (r) => r.state === "Released" || r.state === "Closed",
+  ).length;
   const disputed = rows.filter((r) => r.state === "Disputed").length;
   const inEscrow = rows
-    .filter((r) => r.state === "Active")
+    .filter(
+      (r) =>
+        r.state === "Active" ||
+        r.state === "Released" ||
+        r.state === "Disputed",
+    )
     .reduce((sum, r) => sum + Number(r.depositAmount || 0), 0);
 
   return (

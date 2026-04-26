@@ -130,7 +130,7 @@ function formatDate(value: string) {
 
 function getStatusCopy(row: DisplayRow) {
   if (row.health === "not-aave") return "Not routed";
-  if (row.health === "not-funded") return "Not funded";
+  if (row.health === "not-funded") return "Deposit pending";
   if (row.health === "loading") return "Reading";
   if (row.health === "shortfall") return "Shortfall";
   return "Accruing";

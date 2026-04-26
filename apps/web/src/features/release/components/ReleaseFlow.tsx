@@ -184,7 +184,10 @@ function Inner({
         abi: escrowAbi,
         functionName: "releaseToA",
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") {
+        throw new Error("Release reverted on-chain");
+      }
       return hash;
     });
   }
@@ -197,7 +200,10 @@ function Inner({
         abi: escrowAbi,
         functionName: "refundToB",
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") {
+        throw new Error("Refund reverted on-chain");
+      }
       return hash;
     });
   }
@@ -210,7 +216,10 @@ function Inner({
         abi: escrowAbi,
         functionName: "withdraw",
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") {
+        throw new Error("Withdraw reverted on-chain");
+      }
       return hash;
     });
   }
@@ -225,7 +234,10 @@ function Inner({
         functionName: "flagDispute",
         args: [reason],
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") {
+        throw new Error("Dispute flag reverted on-chain");
+      }
       setShowDispute(false);
       setDisputeReason("");
       return hash;
@@ -240,7 +252,10 @@ function Inner({
         abi: escrowAbi,
         functionName: "cancelDispute",
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") {
+        throw new Error("Cancel dispute reverted on-chain");
+      }
       return hash;
     });
   }
@@ -287,10 +302,9 @@ function Inner({
   );
 
   const canReleaseToA = role === "B" && status.state === "Active";
-  const canRefundToB = role === "A" && status.state === "Active";
+  const canReleaseToB = role === "A" && status.state === "Active";
   const canWithdraw =
-    status.state === "Released" &&
-    ((releasedToA && role === "A") || (releasedToB && role === "B"));
+    status.state === "Released" && Boolean(status.releaseRecipient);
   const canDispute = status.state === "Active" && role !== "observer";
   const canCancelDispute =
     status.state === "Disputed" &&
@@ -337,7 +351,7 @@ function Inner({
         <Banner tone="muted">
           The deposit is held in escrow. {role === "B"
             ? `Release it to ${counterpartyName} when the work is done — they don't need to agree to receive their own payment.`
-            : `Refund the deposit to ${counterpartyName} if the deal is off — they don't need to agree to receive their own money back.`}
+            : `Release it to ${counterpartyName} if the deal is off — they don't need to agree to receive their own money back.`}
         </Banner>
       )}
       {status.state === "Active" && role === "observer" && (
@@ -400,7 +414,6 @@ function Inner({
                 otherWallet={counterpartyWallet}
                 amountLabel={amountLabel}
                 tokenSymbol={tokenConfig.symbol}
-                action={role === "A" ? "refund" : "release"}
               />
             )}
 
@@ -413,9 +426,9 @@ function Inner({
                   onClick={onReleaseToA}
                 />
               ) : null}
-              {canRefundToB ? (
+              {canReleaseToB ? (
                 <ActionButton
-                  label={`Refund $${amountLabel} to ${counterpartyName}`}
+                  label={`Release $${amountLabel} to ${counterpartyName}`}
                   primary
                   pending={stage === "refunding"}
                   onClick={onRefundToB}
@@ -423,7 +436,13 @@ function Inner({
               ) : null}
               {canWithdraw ? (
                 <ActionButton
-                  label={`Withdraw $${amountLabel}`}
+                  label={`Withdraw $${amountLabel} to ${
+                    releasedToA
+                      ? status.partyA.name ?? "Party A"
+                      : releasedToB
+                        ? status.partyB?.name ?? "Party B"
+                        : "recipient"
+                  }`}
                   primary
                   pending={stage === "withdrawing"}
                   onClick={onWithdraw}
@@ -697,7 +716,6 @@ function DirectionalCard({
   otherWallet,
   amountLabel,
   tokenSymbol,
-  action,
 }: {
   youName: string;
   youWallet: `0x${string}`;
@@ -705,16 +723,14 @@ function DirectionalCard({
   otherWallet: `0x${string}` | null;
   amountLabel: string;
   tokenSymbol: string;
-  action: "release" | "refund";
 }) {
-  const verb = action === "release" ? "release" : "refund";
   return (
     <div className="bg-paper p-5" style={{ border: "1px solid var(--color-rule)" }}>
       <div
         className="mb-3 font-mono uppercase text-muted"
         style={{ fontSize: 10, letterSpacing: 1 }}
       >
-        You will {verb} ${amountLabel} {tokenSymbol}
+        You will release ${amountLabel} {tokenSymbol}
       </div>
       <div className="flex items-center gap-3">
         <Endpoint role="From" name={youName} wallet={youWallet} accent />

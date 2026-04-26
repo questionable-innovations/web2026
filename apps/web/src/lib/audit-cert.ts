@@ -19,7 +19,7 @@ export type AuditCertEvent = {
 /// Append a CCLA s.229-style certificate page summarising the on-chain
 /// release. Distinct from `appendSignatureCertificate`: that one is generated
 /// at countersign and stamps signatures; this one is generated at release
-/// and records the lifecycle (proposed → approved → withdrawn) plus tx
+/// and records the lifecycle (released → withdrawn) plus tx
 /// hashes for the audit trail.
 export async function appendAuditCertificate(
   pdfBytes: ArrayBuffer | Uint8Array,

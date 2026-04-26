@@ -32,6 +32,13 @@ export function WalletGate({
     : undefined;
   const privy = useSafePrivy();
   const loginWithOAuth = useSafeLoginWithOAuth();
+  // When Privy is mounted it owns the wagmi connection state. Calling
+  // wagmi's connect() directly makes the wallet flash in and then get
+  // torn down because Privy has no session for it. Route external wallet
+  // connects through privy.connectWallet() instead.
+  const hasInjected =
+    typeof window !== "undefined" &&
+    (window as { ethereum?: unknown }).ethereum !== undefined;
   const showRawErrors = isLocalhost();
 
   if (isConnected && address) {
@@ -95,15 +102,39 @@ export function WalletGate({
           },
         ]
       : []),
-    ...visibleWallets.map((c) => ({
-      kind: "wallet" as const,
-      key: c.uid,
-      name: c.name,
-      tag: describeWalletConnector(c),
-      icon: resolveIcon(c),
-      onSelect: () => connect({ connector: c }),
-      isPending: pendingConnectorUid === c.uid,
-    })),
+    // Privy build: one tile that opens Privy's wallet picker. Privy enumerates
+    // EIP-6963 providers itself and binds the connection to its session, which
+    // is required when @privy-io/wagmi is mounted - calling wagmi's connect()
+    // directly here lets the wallet attach for a frame and then get cleared.
+    ...(hasPrivy
+      ? [
+          {
+            kind: "embedded" as const,
+            key: "privy-wallet",
+            name: "Browser wallet",
+            tag: hasInjected
+              ? "EXTERNAL · MetaMask, Rabby, Coinbase…"
+              : "EXTERNAL · WalletConnect QR",
+            onSelect: () => {
+              void runEmbeddedLogin("privy-wallet", async () => {
+                if (!privy?.connectWallet) {
+                  throw new Error("Wallet connect is not available");
+                }
+                await privy.connectWallet();
+              });
+            },
+            isPending: embeddedPendingKey === "privy-wallet",
+          },
+        ]
+      : visibleWallets.map((c) => ({
+          kind: "wallet" as const,
+          key: c.uid,
+          name: c.name,
+          tag: describeWalletConnector(c),
+          icon: resolveIcon(c),
+          onSelect: () => connect({ connector: c }),
+          isPending: pendingConnectorUid === c.uid,
+        }))),
   ];
 
   return (

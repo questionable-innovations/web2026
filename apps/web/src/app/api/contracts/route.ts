@@ -9,6 +9,7 @@ import { getDepositTokenByAddress } from "@/lib/chain";
 import { erc20Abi } from "@/lib/contracts/abis";
 import { readEscrow, serverPublicClient } from "@/lib/server-chain";
 import { compareDecimalInputs, POSITIVE_DECIMAL_PATTERN } from "@/lib/input";
+import { serializeJson } from "@/lib/json";
 
 const Body = z.object({
   title: z.string().min(1),
@@ -70,7 +71,7 @@ export async function GET(req: Request) {
         .from(contracts)
         .orderBy(desc(contracts.createdAt))
         .limit(100);
-  return NextResponse.json({ contracts: rows });
+  return NextResponse.json(serializeJson({ contracts: rows }));
 }
 
 export async function POST(req: Request) {
@@ -181,5 +182,5 @@ export async function POST(req: Request) {
     email: d.partyA.email,
     attestationHash: d.partyA.attestationHash,
   });
-  return NextResponse.json({ id, escrowAddress: d.escrowAddress });
+  return NextResponse.json(serializeJson({ id, escrowAddress: d.escrowAddress }));
 }

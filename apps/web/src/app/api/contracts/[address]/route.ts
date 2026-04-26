@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contracts } from "@/server/db/schema";
 import { eq, or } from "drizzle-orm";
+import { serializeJson } from "@/lib/json";
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
@@ -33,7 +34,7 @@ export async function GET(
   }
   const counterpartyEmail = (fields.counterpartyEmail as string) ?? null;
 
-  return NextResponse.json({
+  return NextResponse.json(serializeJson({
     id: row.id,
     escrowAddress: row.escrowAddress,
     title: row.title,
@@ -50,5 +51,5 @@ export async function GET(
     dealDeadline: (fields.dealDeadline as number) ?? null,
     state: row.state,
     createdAt: row.createdAt,
-  });
+  }));
 }

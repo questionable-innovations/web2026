@@ -218,8 +218,8 @@ contract Escrow is Initializable, ReentrancyGuard, EIP712Upgradeable {
         emit Released(msg.sender, partyA, amount);
     }
 
-    /// @notice Party A refunds the deposit back to Party B. Mirror image of
-    ///         releaseToA — A is giving up their claim on the funds, so B's
+    /// @notice Party A releases the deposit back to Party B. Mirror image of
+    ///         releaseToA - A is giving up their claim on the funds, so B's
     ///         consent isn't required. Only callable by A; recipient is B.
     function refundToB() external inState(State.Active) {
         if (msg.sender != partyA) revert NotPartyA();

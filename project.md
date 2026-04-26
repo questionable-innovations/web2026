@@ -118,9 +118,9 @@ DocuSign for web3: a PDF signing flow where signing *is* paying a deposit into a
 
 - **`EscrowFactory`** — deploys `Escrow` instances as **EIP-1167 minimal proxies (clones)** off one immutable implementation. ~45k gas per deal vs ~1.5M for full deploys. Factory itself is UUPS-upgradeable behind a timelocked 2-of-3 multisig, but **only new escrows** are ever affected; existing escrows are immutable forever.
 - **`Escrow`** (one clone per agreement, **no admin, no upgrade path**) with state machine:
-  - `Draft` → `AwaitingCounterparty` → `Active` → `Releasing` → `Released` | `Disputed`
+  - `Draft` → `AwaitingCounterparty` → `Active` → `Released` | `Disputed`
   - Stores: PDF CID, content hash, Party A address, **`keccak256(secret)`** (URL capability), deposit token + amount (`immutable` after init), deadline, `validUntil`, milestone array (optional). Party B's address is populated on first successful `countersign`.
-  - Methods: `countersign()`, `proposeRelease()`, `approveRelease()`, `flagDispute()`, `rescue()`.
+  - Methods: `countersign()`, `releaseToA()`, `refundToB()`, `withdraw()`, `flagDispute()`, `rescue()`.
   - Uses `SafeERC20.safeTransferFrom`; asserts `balanceOf` delta equals `amount` (reverts on fee-on-transfer / blacklist failure). Pull-payment for releases, not push. CEI ordering + `ReentrancyGuard` on every state-changing external function — dNZD is ERC-20 today but hook-variants exist and we should not rely on a non-reentrant token.
   - Token address is `immutable`, set at factory-init of the clone. Governance cannot swap it — that would change what asset depositors are owed.
 - **Counterparty gating (anti-griefing) — URL-secret capability model:** Party A generates a random secret at `create`; the contract stores only `keccak256(secret)`. Share link is `https://dealseal.nz/c/<escrow>#<secret>` (secret in the URL **fragment** — never sent to the server, not in server logs or Referer headers). `countersign(secret, ...)` checks `keccak256(secret) == stored` and marks the secret consumed. Escrow has a `validUntil` (e.g. 30 days) so stale links can't be revived.
@@ -140,8 +140,8 @@ DocuSign for web3: a PDF signing flow where signing *is* paying a deposit into a
 2. **Party A signs.** A uses **Quick Sign** default (auto-appended signature block on the last page; freeform drag-place is v2), signs first field via EIP-712 typed data. System emails Party B the share link with the secret in the URL fragment.
 3. **Share link** = `https://dealseal.nz/c/<escrow>#<secret>`. Anyone with the link can *view*; `countersign` requires presenting the secret (preimage of the stored hash). Landing page displays the addressed-to email masked (e.g. `b…@example.com`) so the recipient can self-verify they're the intended party.
 4. **Party B countersigns.** B lands on page — *before* any wallet prompt, page shows PDF preview, Party A's name, deposit amount in NZD, and a 3-step progress (Review → Sign & Pay → Done). B signs in (Privy/Dynamic or existing wallet), verifies their own email via OTP *for the audit certificate* (not for access), views PDF, draws signature, confirms amount (typed-amount confirmation for deposits >$1,000 NZD). **One tx** via multicall: `countersign(secret, attestation)` + `safeTransferFrom` of dNZD into escrow, atomic. This atomicity is the product.
-5. **Receipt.** Explicit copy: "Your $X NZD is held in escrow, not paid to Acme yet. Funds release only when both parties approve." Counters the DocuSign "signing is free" mental model.
-6. **Release.** Either party may call `proposeRelease` once the deal is `Active`; the contract enforces that the *other* party must call `approveRelease` (the proposer can't self-approve). The default UX nudges the payee (A) to propose at contract end-date, and the system emails the counterparty a one-tap deep link back to `/c/<escrow>/release`. Nudges at +3 / +7 / +14 days if either side hasn't acted (still on the build list — see §7 should-have). On mutual approval → state flips to `Released`; payee then calls `withdraw()` (pull-payment) which transitions to `Closed` and moves funds.
+5. **Receipt.** Explicit copy: "Your $X NZD is held in escrow, not paid to Acme yet. You decide when to release it to them; they can release it back to you." Counters the DocuSign "signing is free" mental model.
+6. **Release.** Once the deal is `Active`, Party B may call `releaseToA()` to pay Party A, and Party A may call `refundToB()` to release funds back to Party B. Neither side can pay themselves; the recipient is hardcoded by direction. On release → state flips to `Released`; anyone may call `withdraw()` (pull-payment) which transitions to `Closed` and moves funds to the recorded recipient.
 7. **Audit certificate.** On release, DealSeal generates a signed PDF certificate (copy DocuSign's format): signer identities, timestamps, IPs, user-agents, EIP-712 payload, PDF hash, tx hashes. Required for CCLA s.229 record-keeping and defensible in a NZ dispute. *Implemented:* `GET /api/contracts/<addr>/certificate` builds the cert on demand from on-chain state + off-chain attestations and serves it as a PDF; `POST` to the same route pins the cert to IPFS (idempotent, only pins once `Released`/`Closed`). The release page auto-triggers the pin on terminal state.
 
 ### 4.4 Off-chain DB (SQLite is fine for hackathon)
@@ -174,7 +174,7 @@ Deposits route through **Aave V3 on Avalanche** while sitting in escrow; interes
 
 **Per-clone behaviour:**
 - `countersign()` — supplies the deposit only if `token == aaveSupportedToken && aavePool != 0`. Uses `SafeERC20.forceApprove` (handles USDT-style allowance quirks). For non-Aave tokens, behaviour is unchanged from pre-Aave.
-- `withdraw()` — pulls principal + interest in one Aave call. **Reverts on shortfall** (pool paused / capped / illiquid). The "state change then call" ordering means the revert unwinds state back to `Released`, and partyA can retry once Aave is healthy. Never silently sends less than the released amount.
+- `withdraw()` — pulls principal + interest in one Aave call. **Reverts on shortfall** (pool paused / capped / illiquid). The "state change then call" ordering means the revert unwinds state back to `Released`, and the recipient can retry once Aave is healthy. Never silently sends less than the released amount.
 - `rescue()` — best-effort `try/catch` Aave drain, then sweeps `token.balanceOf(this)`. Aave being broken is a plausible *cause* of needing rescue, so rescue must not depend on a healthy pool.
 
 **Why USDC-only (not "any Aave-listed asset"):** the factory has no admin and no upgrade path for an allowlist. Pinning to one token is the simplest static config that doesn't risk a future Aave listing changing security assumptions. Adding more tokens = redeploy the factory (acceptable — only affects new clones, in line with §4.2).
@@ -364,13 +364,13 @@ Not a substitute for actual legal advice. Get a tech-and-financial-services lawy
 | Signature replay across chains | EIP-712 without chainId pinning | Domain separator pins `chainId` + verifying contract. |
 | Reentrancy via token hook | Deposit / release paths | `ReentrancyGuard` + strict CEI + pull-payment releases. `SafeERC20.safeTransferFrom`. |
 | Fee-on-transfer / blacklist silent underfund | Deposit path | Assert `balanceOf` delta equals `amount`; revert otherwise. |
-| Approve-then-mutate | `proposeRelease` signed by one party, recipient changed by proposer before `approveRelease` | Proposal hash-commits recipient + amount; approver signs over the hash. |
+| Self-release | Signer tries to release funds to themselves | Directional entrypoints hardcode the opposite party as recipient. |
 | Admin-key compromise draining live escrow | Upgradeable escrow | Per-deal escrow is immutable, no admin. Factory upgrades only affect new clones. |
 | dNZD pause / blacklist bricks escrow indefinitely | Token-issuer action | `rescue()` path after `RESCUE_TIMEOUT` (≥ 365 days) redirects to non-blacklisted party. |
 | Token swap changes asset depositors own | Mutable token address | Token is `immutable` on the escrow clone, set at init. |
 | PII leak via on-chain data | Naïve commitment format | Name/email stored as **salted** hashes (per-attestation salt); plaintext only off-chain. |
 | Stale share link revived months later | Capability reuse | `validUntil` on the escrow; secret marked consumed on first successful countersign. |
-| Aave shortfall silently shrinks payout | `withdraw` path with Aave enabled (§4.6) | `withdraw` reverts on `totalWithdrawn < amt` and the state revert lets partyA retry once Aave is healthy. Never sends less than the released amount. |
+| Aave shortfall silently shrinks payout | `withdraw` path with Aave enabled (§4.6) | `withdraw` reverts on `totalWithdrawn < amt` and the state revert lets the recipient retry once Aave is healthy. Never sends less than the released amount. |
 | Aave outage permanently bricks rescue | `rescue` path with Aave enabled | Aave drain is `try/catch`; rescue then sweeps `token.balanceOf` regardless. Funds left in a paused pool are recoverable later via a follow-up `withdraw`. |
 | Aave brick on non-listed asset deposit | `countersign` with Aave globally enabled | Per-clone gate: only `aaveSupportedToken` clones touch Aave. dNZD and other unlisted assets bypass the supply call entirely. |
 | Stale ERC-20 allowance to Aave Pool blocks subsequent supply | USDT-style tokens reverting on non-zero→non-zero allowance | `SafeERC20.forceApprove` zeroes first, then sets, on every supply. |
@@ -382,8 +382,8 @@ Not a substitute for actual legal advice. Get a tech-and-financial-services lawy
 - State machine: no transition out of `Released`; `Disputed` reachable only from `Active`; no transition back to `Draft`.
 - Only `partyA` / `partyB` can advance state — fuzz with random callers.
 - Signature replay: same EIP-712 sig cannot be used twice; fuzz across chainIds to confirm domain separator defeats cross-chain replay.
-- Symbolic check (`halmos`) on `approveRelease`: no input causes funds to flow to a non-signer address.
+- Symbolic check (`halmos`) on release/withdraw: no input causes funds to flow to a non-signer address.
 - URL-secret: `countersign` reverts if preimage doesn't match stored hash; succeeds exactly once; reverts after `validUntil`.
 - `rescue()` is unreachable before `RESCUE_TIMEOUT`.
-- **Aave (§4.6):** for any clone deployed against an Aave-enabled factory + supported token: post-`withdraw`, partyA's net token balance increases by exactly `amount`, and `platformWallet`'s balance increases by exactly `aBalance - amount` at withdraw time. Across `withdraw` + `rescue` paths, no token sits stranded on the clone (`token.balanceOf(clone) == 0` after termination).
+- **Aave (§4.6):** for any clone deployed against an Aave-enabled factory + supported token: post-`withdraw`, the release recipient's net token balance increases by exactly `amount`, and `platformWallet`'s balance increases by exactly `aBalance - amount` at withdraw time. Across `withdraw` + `rescue` paths, no token sits stranded on the clone (`token.balanceOf(clone) == 0` after termination).
 - **Aave (§4.6):** for any clone deployed against an Aave-disabled factory or a non-supported token: clone never calls into the Aave pool (mock pool reverts on any call → all happy-path tests still pass).

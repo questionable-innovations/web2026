@@ -379,7 +379,7 @@ contract EscrowTest is Test {
     }
 
     function test_partyBCannotRefundToB() public {
-        // Mirror image: only Party A can refund the deposit back to Party B.
+        // Mirror image: only Party A can release the deposit back to Party B.
         Escrow e = _createWithSig();
         bytes32 pdfHash = keccak256("pdf-bytes");
         (Escrow.Attestation memory aB, bytes memory sigB) =

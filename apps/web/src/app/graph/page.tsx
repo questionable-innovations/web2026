@@ -174,7 +174,7 @@ function BlockchainFlowGraph() {
 
       <Node x={46} y={276} w={300} h={112} title="Escrow.countersign" lines={["check secret hash", "verify attestation", "deposit token", "state -> Active"]} tone="accent" />
       <Node x={392} y={276} w={280} h={112} title="ERC20.safeTransferFrom" lines={["pull deposit from Party B", "assert exact balance delta", "reject bad token behavior"]} tone="amber" />
-      <Node x={722} y={276} w={314} h={112} title="Escrow.releaseToA / refundToB" lines={["B releases to A; A refunds to B", "self-pay is impossible", "state -> Released"]} tone="green" />
+      <Node x={722} y={276} w={314} h={112} title="Escrow.releaseToA / refundToB" lines={["B releases to A; A releases to B", "self-pay is impossible", "state -> Released"]} tone="green" />
       <Node x={1088} y={276} w={266} h={112} title="Escrow.withdraw" lines={["pull principal back", "optional Aave unwind", "state -> Closed"]} />
 
       <Node x={46} y={456} w={300} h={108} title="Escrow.flagDispute / cancelDispute" lines={["freeze deal", "store reason", "restore exact prior state"]} tone="accent" />

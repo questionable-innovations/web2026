@@ -537,7 +537,8 @@ function BReceipt({ info }: { info: ContractInfo }) {
           >
             Not paid to {info.partyAName ?? "Party A"} yet. Funds release only
             when you release it to {info.partyAName ?? "Party A"}, or when
-            they refund you. You can verify the deposit on-chain right now.
+            they release it back to you. You can verify the deposit on-chain
+            right now.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">

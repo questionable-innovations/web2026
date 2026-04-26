@@ -5,7 +5,6 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
-  Check,
   CornerDownRight,
   Flag,
 } from "lucide-react";
@@ -52,7 +51,7 @@ const IPFS_GATEWAY =
 type Stage =
   | "idle"
   | "releasing"
-  | "refunding"
+  | "releasingToB"
   | "withdrawing"
   | "disputing"
   | "cancelling"
@@ -194,7 +193,7 @@ function Inner({
 
   async function onRefundToB() {
     if (!publicClient) return;
-    await withTx("refunding", async () => {
+    await withTx("releasingToB", async () => {
       const hash = await writeContract({
         address: escrowAddress as `0x${string}`,
         abi: escrowAbi,
@@ -430,7 +429,7 @@ function Inner({
                 <ActionButton
                   label={`Release $${amountLabel} to ${counterpartyName}`}
                   primary
-                  pending={stage === "refunding"}
+                  pending={stage === "releasingToB"}
                   onClick={onRefundToB}
                 />
               ) : null}

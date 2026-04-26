@@ -796,7 +796,7 @@ function DetailsStep({
           }}
         >
           <CornerDownRight size={12} className="text-accent inline-block mr-1 align-text-bottom" />
-          You can refund the deposit to your counterparty any time; they can release it to you any time. Neither side can pull funds to themselves.
+          You can release the deposit to your counterparty any time; they can release it to you any time. Neither side can pull funds to themselves.
         </div>
 
         <div className="mt-7 flex justify-between border-t border-rule-soft pt-6">

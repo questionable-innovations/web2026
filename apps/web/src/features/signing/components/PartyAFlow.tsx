@@ -30,6 +30,11 @@ import {
 import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { isLocalhost } from "@/lib/isLocalhost";
+import {
+  decimalInputError,
+  isPositiveDecimalInput,
+  sanitizeDecimalInput,
+} from "@/lib/input";
 import { PdfViewer } from "./PdfViewer";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
@@ -75,14 +80,6 @@ const STEPS: [string, Stage[]][] = [
   ["Sign", ["sign", "deploying", "registering"]],
   ["Send", ["share"]],
 ];
-
-// Keep currency fields strictly decimal so letters never enter state.
-function sanitizeDecimalInput(value: string): string {
-  const cleaned = value.replace(/[^\d.]/g, "");
-  const parts = cleaned.split(".");
-  if (parts.length <= 1) return cleaned;
-  return `${parts[0]}.${parts.slice(1).join("")}`;
-}
 
 function blockNonDecimalKey(e: KeyboardEvent<HTMLInputElement>) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -326,6 +323,7 @@ function DetailsStep({
     );
     return String(Math.max(1, remaining));
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const loadDemo = async () => {
     setIsAnalyzing(true);
@@ -384,9 +382,30 @@ function DetailsStep({
 
   const selectedToken =
     depositTokens.find((token) => token.id === depositTokenId) ?? depositToken;
+  const amountValid = isPositiveDecimalInput(amount);
+  const totalDueValid = !totalDue || isPositiveDecimalInput(totalDue);
+  const dayCount = Number(days);
+  const daysValid =
+    days.trim() !== "" && Number.isInteger(dayCount) && dayCount > 0;
+  const canContinue = Boolean(file) && amountValid && totalDueValid && daysValid;
+  const moneyError = !amount
+    ? "Deposit is required."
+    : !amountValid
+      ? decimalInputError("Deposit")
+      : totalDue && !totalDueValid
+        ? decimalInputError("Total due")
+        : null;
+  const deadlineError =
+    days && !daysValid ? "Deadline must be at least 1 day." : null;
+  const visibleError =
+    formError ??
+    (amount && !amountValid ? decimalInputError("Deposit") : null) ??
+    (totalDue && !totalDueValid ? decimalInputError("Total due") : null) ??
+    deadlineError;
 
   const deadlineLabel = useMemo(() => {
-    const d = new Date(Date.now() + Number(days || 0) * 86400_000);
+    const safeDays = Math.max(1, Number(days || 1));
+    const d = new Date(Date.now() + safeDays * 86400_000);
     return d.toISOString().slice(0, 10);
   }, [days]);
 
@@ -397,9 +416,11 @@ function DetailsStep({
       onSubmit={(e) => {
         e.preventDefault();
         if (!file) return;
-        // Contract rejects deadline <= now; require at least 1 day so the
-        // user gets a clear UI error instead of a wallet-prompt revert.
-        const dayCount = Math.max(1, Number(days || 0));
+        if (!canContinue) {
+          setFormError(moneyError ?? deadlineError ?? "Check the form details.");
+          return;
+        }
+        setFormError(null);
         onNext({
           file,
           title,
@@ -522,7 +543,13 @@ function DetailsStep({
             inputMode="decimal"
             onKeyDown={blockNonDecimalKey}
             value={totalDue}
-            onChange={(e) => setTotalDue(sanitizeDecimalInput(e.target.value))}
+            onChange={(e) => {
+              setFormError(null);
+              setTotalDue(
+                sanitizeDecimalInput(e.target.value, selectedToken.decimals),
+              );
+            }}
+            aria-invalid={Boolean(totalDue && !totalDueValid)}
             placeholder="10,000.00"
             className="flex-1 bg-transparent font-serif outline-none"
             style={{ fontSize: 32, lineHeight: 1 }}
@@ -531,7 +558,7 @@ function DetailsStep({
             className="font-mono uppercase text-muted"
             style={{ fontSize: 10, letterSpacing: 1 }}
           >
-            = {totalDue || "0"} {selectedToken.symbol}
+            = {totalDue || "-"} {selectedToken.symbol}
           </span>
         </div>
 
@@ -553,7 +580,13 @@ function DetailsStep({
               inputMode="decimal"
               onKeyDown={blockNonDecimalKey}
               value={amount}
-              onChange={(e) => setAmount(sanitizeDecimalInput(e.target.value))}
+              onChange={(e) => {
+                setFormError(null);
+                setAmount(
+                  sanitizeDecimalInput(e.target.value, selectedToken.decimals),
+                );
+              }}
+              aria-invalid={Boolean(amount && !amountValid)}
               placeholder="4,800.00"
               className="flex-1 bg-transparent font-serif outline-none"
               style={{ fontSize: 32, lineHeight: 1 }}
@@ -562,7 +595,7 @@ function DetailsStep({
               className="font-mono uppercase text-muted"
               style={{ fontSize: 10, letterSpacing: 1 }}
             >
-              = {amount || "0"} {selectedToken.symbol}
+              = {amount || "-"} {selectedToken.symbol}
             </span>
           </div>
           <div>
@@ -571,9 +604,11 @@ function DetailsStep({
               <input
                 inputMode="numeric"
                 value={days}
-                onChange={(e) =>
-                  setDays(e.target.value.replace(/\D/g, "") || "0")
-                }
+                onChange={(e) => {
+                  setFormError(null);
+                  setDays(e.target.value.replace(/\D/g, ""));
+                }}
+                aria-invalid={Boolean(days && !daysValid)}
                 className="w-10 bg-transparent text-right outline-none"
               />
               <span className="text-muted">days · {deadlineLabel}</span>
@@ -597,6 +632,15 @@ function DetailsStep({
           </select>
         </div>
 
+        {visibleError && (
+          <p
+            className="mt-3 font-mono text-accent"
+            style={{ fontSize: 11, lineHeight: 1.5 }}
+          >
+            {visibleError}
+          </p>
+        )}
+
         <div
           className="mt-3 px-3.5 py-3 font-mono"
           style={{
@@ -617,7 +661,7 @@ function DetailsStep({
           </span>
           <button
             type="submit"
-            disabled={!file}
+            disabled={!canContinue}
             className="inline-flex items-center gap-2 bg-ink px-5 py-3 text-[13px] text-paper disabled:opacity-50"
           >
             Continue to sign
@@ -1015,7 +1059,7 @@ function Summary({
       />
       <Row
         k="Total Due"
-        v={`${details.totalDue || "0"} ${details.depositToken.symbol}`}
+        v={`${details.totalDue || "-"} ${details.depositToken.symbol}`}
       />
       <Row k="Deposit" v={`${details.amount} ${details.depositToken.symbol}`} />
       <Row k="You" v={`${profile.name} · ${profile.email}`} />
@@ -1164,7 +1208,7 @@ function ShareStep({
             <Row k="amount" v={`${details.amount} ${details.depositToken.symbol}`} />
             <Row
               k="total due"
-              v={`${details.totalDue || "0"} ${details.depositToken.symbol}`}
+              v={`${details.totalDue || "-"} ${details.depositToken.symbol}`}
             />
             <Row
               k="validUntil"

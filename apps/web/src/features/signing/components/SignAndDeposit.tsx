@@ -15,6 +15,7 @@ import { activeChain, getDepositTokenByAddress } from "@/lib/chain";
 import { erc20Abi, escrowAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { isLocalhost } from "@/lib/isLocalhost";
+import { sanitizeDecimalInput } from "@/lib/input";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
 import { ChainGate } from "./ChainGate";
@@ -364,7 +365,11 @@ function Inner({
             <input
               inputMode="decimal"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value.replace(/[^0-9.]/g, ""))}
+              onChange={(e) =>
+                setConfirm(
+                  sanitizeDecimalInput(e.target.value, selectedToken.decimals),
+                )
+              }
               placeholder={exactAmount}
               className="flex-1 bg-transparent text-paper outline-none placeholder:text-ink-faint"
             />

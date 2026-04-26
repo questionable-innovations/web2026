@@ -94,7 +94,7 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
       {!compact && (
         <g>
           <path
-            d={`M 420 ${yMain + 24} Q 420 ${yMain + 68} 510 ${yMain + 100}`}
+            d={`M 500 ${yMain + 24} Q 500 ${yMain + 68} 568 ${yMain + 100}`}
             fill="none"
             stroke={accent}
             strokeWidth="1"
@@ -142,7 +142,7 @@ export function StateMachine({ compact = false }: { compact?: boolean }) {
           </text>
 
           <path
-            d={`M 590 ${yMain + 24} Q 590 ${yMain + 70} 860 ${yMain + 100}`}
+            d={`M 720 ${yMain + 24} Q 720 ${yMain + 70} 860 ${yMain + 100}`}
             fill="none"
             stroke={ink}
             strokeWidth="1"

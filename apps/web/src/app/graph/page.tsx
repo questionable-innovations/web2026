@@ -26,8 +26,8 @@ const contracts = [
     functions: [
       "initialize(...)",
       "countersign(bytes32 secret, ...)",
-      "proposeRelease()",
-      "approveRelease()",
+      "releaseToA()",
+      "refundToB()",
       "withdraw()",
       "flagDispute(string reason)",
       "cancelDispute()",
@@ -72,7 +72,7 @@ export default function GraphPage() {
             </p>
             <div className="mt-4 flex flex-wrap gap-2 font-mono uppercase" style={{ fontSize: 10, letterSpacing: 1 }}>
               <Tag>deterministic clone</Tag>
-              <Tag>mutual approval</Tag>
+              <Tag>symmetric release</Tag>
               <Tag>optional yield</Tag>
               <Tag>read-only stats</Tag>
             </div>
@@ -132,7 +132,7 @@ export default function GraphPage() {
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             <MiniStat label="Entry point" value="createEscrowDeterministic()" />
             <MiniStat label="Money move" value="countersign() + transferFrom" />
-            <MiniStat label="Release gate" value="proposeRelease() + approveRelease()" />
+            <MiniStat label="Release gate" value="releaseToA() / refundToB()" />
             <MiniStat label="Fallback" value="flagDispute() / rescue()" />
           </div>
         </div>
@@ -174,7 +174,7 @@ function BlockchainFlowGraph() {
 
       <Node x={46} y={276} w={300} h={112} title="Escrow.countersign" lines={["check secret hash", "verify attestation", "deposit token", "state -> Active"]} tone="accent" />
       <Node x={392} y={276} w={280} h={112} title="ERC20.safeTransferFrom" lines={["pull deposit from Party B", "assert exact balance delta", "reject bad token behavior"]} tone="amber" />
-      <Node x={722} y={276} w={314} h={112} title="Escrow.proposeRelease / approveRelease" lines={["two-party approval", "proposer cannot self-approve", "state -> Released"]} tone="green" />
+      <Node x={722} y={276} w={314} h={112} title="Escrow.releaseToA / refundToB" lines={["B releases to A; A refunds to B", "self-pay is impossible", "state -> Released"]} tone="green" />
       <Node x={1088} y={276} w={266} h={112} title="Escrow.withdraw" lines={["pull principal back", "optional Aave unwind", "state -> Closed"]} />
 
       <Node x={46} y={456} w={300} h={108} title="Escrow.flagDispute / cancelDispute" lines={["freeze deal", "store reason", "restore exact prior state"]} tone="accent" />
@@ -199,7 +199,7 @@ function BlockchainFlowGraph() {
       <Arrow fromX={522} fromY={560} toX={522} toY={628} label="history source" />
       <Arrow fromX={878} fromY={560} toX={878} toY={628} label="derived output" />
 
-      <FlowPanel x={1088} y={628} title="Lifecycle" lines={["AwaitingCounterparty", "Active", "Releasing", "Released", "Closed / Disputed / Rescued"]} />
+      <FlowPanel x={1088} y={628} title="Lifecycle" lines={["AwaitingCounterparty", "Active", "Released", "Closed / Disputed / Rescued"]} />
 
       <text x="46" y="32" fill={ink} fontFamily="var(--font-serif)" fontSize="28">
         Blockchain function graph

@@ -15,9 +15,19 @@ export async function GET(
   const { address } = await params;
   const lower = address.toLowerCase();
 
+  // This endpoint is polled — explicitly skip the blob columns so we don't
+  // pull megabytes of PDF bytes into memory on every tick.
   const row = (
     await db
-      .select()
+      .select({
+        id: contracts.id,
+        title: contracts.title,
+        pdfHash: contracts.pdfHash,
+        pdfCid: contracts.pdfCid,
+        signedPdfCid: contracts.signedPdfCid,
+        depositToken: contracts.depositToken,
+        fieldsJson: contracts.fieldsJson,
+      })
       .from(contracts)
       .where(or(eq(contracts.escrowAddress, lower), eq(contracts.id, address)))
       .limit(1)

@@ -5,6 +5,7 @@ import { ArrowRight, CornerDownRight } from "lucide-react";
 import logoIcon from "@/app/logodealsealicononly.png";
 import { SignPayHero } from "@/components/SignPayHero";
 import { StateMachine } from "@/components/StateMachine";
+import { LandingLookup } from "@/features/reputation/components/LandingLookup";
 import { activeChain, depositToken } from "@/lib/chain";
 
 const SECTION_PAD = "px-20";
@@ -533,67 +534,7 @@ function Reputation() {
           </div>
         </div>
 
-        <div className="border border-rule bg-card p-8">
-          <div className="flex items-baseline justify-between">
-            <div>
-              <Eyebrow>Reputation view</Eyebrow>
-              <div
-                className="mt-1.5 font-serif"
-                style={{ fontSize: 32 }}
-              >
-                Wallet-scoped profile
-              </div>
-              <div className="mt-1 text-[13px] text-muted">
-                Connected wallet plus indexed contract history
-              </div>
-            </div>
-            <div
-              className="bg-accent font-mono text-white"
-              style={{
-                padding: "6px 12px",
-                fontSize: 10,
-                letterSpacing: 1,
-              }}
-            >
-              PUBLIC SUMMARY
-            </div>
-          </div>
-
-          <div style={{ height: 28 }} />
-
-          <div
-            className="grid grid-cols-3 border border-rule"
-            style={{ gap: 1, background: "var(--color-rule)" }}
-          >
-            {[
-              ["Released", "Completed deals"],
-              ["Disputed", "Flagged deals"],
-              ["First seen", "Indexed start"],
-            ].map(([v, l]) => (
-              <div key={l} className="bg-card px-4 py-5">
-                <div className="font-serif" style={{ fontSize: 36, lineHeight: 1 }}>
-                  {v}
-                </div>
-                <div
-                  className="mt-1.5 font-mono uppercase text-muted"
-                  style={{ fontSize: 10, letterSpacing: 1 }}
-                >
-                  {l}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ height: 24 }} />
-          <div
-            className="font-mono text-muted"
-            style={{ fontSize: 11, lineHeight: 1.6 }}
-          >
-            <div>Amounts can be banded instead of shown raw</div>
-            <div>Counterparties stay hidden</div>
-            <div>Wallet remains the identity anchor</div>
-          </div>
-        </div>
+        <LandingLookup />
       </div>
     </Section>
   );

@@ -57,8 +57,21 @@ type Stage =
   | "sign"
   | "deploying"
   | "registering"
-  | "share"
-  | "error";
+  | "share";
+
+function describeFlowError(err: unknown, showRaw: boolean): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const name = err instanceof Error ? err.name : "";
+  if (
+    name === "UserRejectedRequestError" ||
+    /user (rejected|denied)/i.test(message)
+  ) {
+    return "You cancelled the transaction in your wallet — click Sign & deploy when you're ready to try again.";
+  }
+  return showRaw
+    ? message
+    : "Something went wrong submitting the transaction. Try again.";
+}
 
 type Details = {
   file: File;
@@ -215,6 +228,7 @@ function Inner({
             profile={profile}
             stage={stage}
             setStage={setStage}
+            error={error}
             setError={setError}
             onDone={(r) => {
               setResult(r);
@@ -225,22 +239,6 @@ function Inner({
 
       {stage === "share" && result && details && (
         <ShareStep result={result} details={details} />
-      )}
-
-      {stage === "error" && (
-        <div className="space-y-3">
-          <p className="text-sm text-accent">{error}</p>
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              setStage(details ? "sign" : "details");
-            }}
-            className="border border-rule px-4 py-2 text-sm"
-          >
-            Try again
-          </button>
-        </div>
       )}
     </div>
   );
@@ -801,6 +799,7 @@ function SignStep({
   profile,
   stage,
   setStage,
+  error,
   setError,
   onDone,
 }: {
@@ -809,12 +808,16 @@ function SignStep({
   profile: Profile;
   stage: Stage;
   setStage: (s: Stage) => void;
+  error: string | null;
   setError: (e: string | null) => void;
   onDone: (r: Result) => void;
 }) {
   const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
-  const publicClient = usePublicClient();
+  // Pin to the configured chain. Default `usePublicClient()` follows the
+  // wallet's current chain, which can drift past ChainGate (e.g. wallet
+  // network switch mid-flow) and silently route reads to the wrong RPC.
+  const publicClient = usePublicClient({ chainId });
   const { writeContract, signTypedData } = useActiveWallet();
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [stampedFile, setStampedFile] = useState<File | null>(null);
@@ -900,6 +903,25 @@ function SignStep({
           Back to details
         </button>
 
+        {error && stage === "sign" && (
+          <div
+            className="flex items-start gap-2.5 border border-accent bg-accent-soft px-4 py-3"
+            role="alert"
+            style={{ fontSize: 12, lineHeight: 1.5 }}
+          >
+            <span className="flex-1 text-ink">{error}</span>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="font-mono text-accent"
+              style={{ fontSize: 10, letterSpacing: 1 }}
+              aria-label="Dismiss error"
+            >
+              DISMISS
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
           disabled={
@@ -964,12 +986,16 @@ function SignStep({
               const validUntil =
                 linkExpiry < dealDeadline ? linkExpiry : dealDeadline;
               // Read decimals from chain - env-derived decimals risk an
-              // off-by-10^n bug if misconfigured.
-              const decimals = (await publicClient.readContract({
-                address: details.depositToken.address,
-                abi: erc20Abi,
-                functionName: "decimals",
-              })) as number;
+              // off-by-10^n bug if misconfigured. Fall back to env if the
+              // read returns no data (e.g. transient RPC blip), matching
+              // SignAndDeposit.tsx.
+              const decimals = (await publicClient
+                .readContract({
+                  address: details.depositToken.address,
+                  abi: erc20Abi,
+                  functionName: "decimals",
+                })
+                .catch(() => details.depositToken.decimals)) as number;
               const amountWei = parseUnits(details.amount, decimals);
 
               const txHash = await writeContract({
@@ -1024,6 +1050,18 @@ function SignStep({
               });
               if (!res.ok) throw new Error("Failed to save contract index");
 
+              // Persist the original bytes server-side so reads don't depend
+              // on flaky public IPFS gateways. IPFS pin still happens above
+              // because the cid is committed on-chain.
+              const blobFd = new FormData();
+              blobFd.append("file", details.file);
+              await fetch(`/api/contracts/${predicted}/blob`, {
+                method: "POST",
+                body: blobFd,
+              }).catch((err) =>
+                console.error("Original PDF blob upload failed", err),
+              );
+
               let signedPdfCid: string | null = null;
               if (signatureDataUrl) {
                 const stamped = await appendSignatureCertificate(buf, [
@@ -1037,19 +1075,29 @@ function SignStep({
                     signaturePngDataUrl: signatureDataUrl,
                   },
                 ]);
-                const stampedFd = new FormData();
-                stampedFd.append(
-                  "file",
-                  new File(
-                    [
-                      new Blob([stamped as BlobPart], {
-                        type: "application/pdf",
-                      }),
-                    ],
-                    `${details.title || "contract"}-signed.pdf`,
-                    { type: "application/pdf" },
-                  ),
+                const stampedFile = new File(
+                  [
+                    new Blob([stamped as BlobPart], {
+                      type: "application/pdf",
+                    }),
+                  ],
+                  `${details.title || "contract"}-signed.pdf`,
+                  { type: "application/pdf" },
                 );
+                // Store the stamped bytes server-side first so the PDF view
+                // works immediately. IPFS pin runs in parallel and updates
+                // the cid index when (and if) it succeeds.
+                const stampedBlobFd = new FormData();
+                stampedBlobFd.append("file", stampedFile);
+                await fetch(
+                  `/api/contracts/${predicted}/blob?signed=1`,
+                  { method: "POST", body: stampedBlobFd },
+                ).catch((err) =>
+                  console.error("Signed PDF blob upload failed", err),
+                );
+
+                const stampedFd = new FormData();
+                stampedFd.append("file", stampedFile);
                 const stampedRes = await fetch("/api/ipfs", {
                   method: "POST",
                   body: stampedFd,
@@ -1074,14 +1122,9 @@ function SignStep({
                 signedPdfCid,
               });
             } catch (err) {
-              setError(
-                showRawErrors
-                  ? err instanceof Error
-                    ? err.message
-                    : "Something went wrong"
-                  : "An error occurred.",
-              );
-              setStage("error");
+              console.error("Party A sign-and-deploy flow failed", err);
+              setError(describeFlowError(err, showRawErrors));
+              setStage("sign");
             }
           }}
         >

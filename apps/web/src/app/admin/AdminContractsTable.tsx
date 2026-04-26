@@ -165,6 +165,7 @@ export function AdminContractsTable({
             abi: aTokenAbi,
             functionName: "balanceOf",
             args: [contract.escrowAddress as Address],
+            chainId: activeChain.id,
           }
         : null;
     });

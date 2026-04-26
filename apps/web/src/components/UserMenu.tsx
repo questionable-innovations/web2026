@@ -76,6 +76,7 @@ export function UserMenu() {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
+    chainId: activeChain.id,
     query: { enabled: !!address },
   });
 

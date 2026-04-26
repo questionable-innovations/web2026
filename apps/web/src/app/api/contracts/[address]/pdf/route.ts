@@ -21,6 +21,21 @@ export async function GET(
   if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const wantSigned = new URL(req.url).searchParams.get("signed") === "1";
+  const blob = wantSigned && row.signedPdfBlob ? row.signedPdfBlob : row.pdfBlob;
+  if (blob) {
+    const view = blob as Buffer;
+    const body = view.buffer.slice(
+      view.byteOffset,
+      view.byteOffset + view.byteLength,
+    ) as ArrayBuffer;
+    return new NextResponse(body, {
+      headers: {
+        "content-type": "application/pdf",
+        "cache-control": "private, max-age=60",
+      },
+    });
+  }
+
   const onchain = /^0x[0-9a-fA-F]{40}$/.test(address)
     ? await readEscrow(address as `0x${string}`).catch(() => null)
     : null;

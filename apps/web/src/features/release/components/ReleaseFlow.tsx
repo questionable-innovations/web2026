@@ -16,7 +16,7 @@ import { WalletGate } from "@/features/signing/components/WalletGate";
 import { ChainGate } from "@/features/signing/components/ChainGate";
 import { PdfViewer } from "@/features/signing/components/PdfViewer";
 import { escrowAbi } from "@/lib/contracts/abis";
-import { depositToken } from "@/lib/chain";
+import { activeChain, depositToken } from "@/lib/chain";
 
 type ReleaseStatus = {
   escrowAddress: `0x${string}`;
@@ -80,7 +80,9 @@ function Inner({
   escrowAddress: string;
   wallet: `0x${string}`;
 }) {
-  const publicClient = usePublicClient();
+  // Pin to the configured chain so receipt polling hits the same RPC the tx
+  // was sent to, even if the wallet's network drifts post-submit.
+  const publicClient = usePublicClient({ chainId: activeChain.id });
   const { writeContract, address: activeAddress } = useActiveWallet();
 
   const [status, setStatus] = useState<ReleaseStatus | null>(null);

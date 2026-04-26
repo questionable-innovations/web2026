@@ -83,7 +83,10 @@ function Inner({
 }) {
   const showRawErrors = isLocalhost();
   const chainId = activeChain.id;
-  const publicClient = usePublicClient();
+  // Pin to the configured chain. Default `usePublicClient()` follows the
+  // wallet's current chain, which can drift past ChainGate (e.g. wallet
+  // network switch mid-flow) and silently route reads to the wrong RPC.
+  const publicClient = usePublicClient({ chainId });
   const { writeContract, signTypedData } = useActiveWallet();
 
   const [confirm, setConfirm] = useState("");
@@ -104,18 +107,21 @@ function Inner({
     address: info.escrowAddress,
     abi: escrowAbi,
     functionName: "amount",
+    chainId,
   });
   const { data: balance, refetch: refetchBalance } = useReadContract({
     address: info.depositToken,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [wallet],
+    chainId,
   });
   const { data: allowance } = useReadContract({
     address: info.depositToken,
     abi: erc20Abi,
     functionName: "allowance",
     args: [wallet, info.escrowAddress],
+    chainId,
   });
   // Source of truth: the token contract. Falls back to env until the
   // network read lands so the UI doesn't flash NaN.
@@ -123,6 +129,7 @@ function Inner({
     address: info.depositToken,
     abi: erc20Abi,
     functionName: "decimals",
+    chainId,
   });
   const decimals =
     typeof onchainDecimals === "number"
@@ -253,17 +260,25 @@ function Inner({
               signaturePngDataUrl: inkDataUrl,
             },
           ]);
-          const fd = new FormData();
-          fd.append(
-            "file",
-            new File(
-              [
-                new Blob([stamped as BlobPart], { type: "application/pdf" }),
-              ],
-              "contract-signed.pdf",
-              { type: "application/pdf" },
-            ),
+          const stampedFile = new File(
+            [new Blob([stamped as BlobPart], { type: "application/pdf" })],
+            "contract-signed.pdf",
+            { type: "application/pdf" },
           );
+
+          // Store the bytes first — the next read (receipt page, dashboard)
+          // serves from this blob without needing IPFS to settle.
+          const blobFd = new FormData();
+          blobFd.append("file", stampedFile);
+          await fetch(
+            `/api/contracts/${info.escrowAddress}/blob?signed=1`,
+            { method: "POST", body: blobFd },
+          ).catch((err) =>
+            console.error("Signed PDF blob upload failed", err),
+          );
+
+          const fd = new FormData();
+          fd.append("file", stampedFile);
           const pin = await fetch("/api/ipfs", { method: "POST", body: fd });
           if (pin.ok) {
             const { cid: signedCid } = (await pin.json()) as { cid: string };

@@ -38,6 +38,7 @@ export function FundWalletPanel({
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [wallet],
+    chainId: activeChain.id,
   });
 
   const have = (erc20.data as bigint | undefined) ?? 0n;

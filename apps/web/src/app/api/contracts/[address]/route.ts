@@ -40,6 +40,7 @@ export async function GET(
     pdfCid: row.pdfCid,
     pdfHash: row.pdfHash,
     signedPdfCid: row.signedPdfCid,
+    hasSignedPdf: Boolean(row.signedPdfCid || row.signedPdfBlob),
     partyAWallet: row.partyAWallet,
     partyAName: (fields.partyAName as string) ?? null,
     counterpartyEmailMasked: counterpartyEmail ? maskEmail(counterpartyEmail) : null,

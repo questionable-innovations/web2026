@@ -31,7 +31,6 @@ export async function appendSignatureCertificate(
   const card = rgb(1, 1, 1);
   const ink = rgb(0.04, 0.04, 0.04);
   const accent = rgb(0.85, 0.29, 0.15);
-  const accentSoft = rgb(0.99, 0.9, 0.87);
   const muted = rgb(0.54, 0.52, 0.49);
   const rule = rgb(0.86, 0.84, 0.8);
   const green = rgb(0.18, 0.48, 0.29);
@@ -67,20 +66,6 @@ export async function appendSignatureCertificate(
     size: 9,
     font: mono,
     color: muted,
-  });
-  page.drawCircle({
-    x: width - margin - 22,
-    y: y - 40,
-    size: 18,
-    borderColor: accent,
-    borderWidth: 1,
-  });
-  page.drawText("DS", {
-    x: width - margin - 30,
-    y: y - 44,
-    size: 10,
-    font: helvBold,
-    color: accent,
   });
 
   y -= 72;
@@ -133,10 +118,10 @@ export async function appendSignatureCertificate(
       helvBold,
       serif,
       mono,
+      paper,
       card,
       ink,
       accent,
-      accentSoft,
       muted,
       rule,
       green,
@@ -168,10 +153,10 @@ type DrawCtx = {
   helvBold: import("pdf-lib").PDFFont;
   serif: import("pdf-lib").PDFFont;
   mono: import("pdf-lib").PDFFont;
+  paper: ReturnType<typeof rgb>;
   card: ReturnType<typeof rgb>;
   ink: ReturnType<typeof rgb>;
   accent: ReturnType<typeof rgb>;
-  accentSoft: ReturnType<typeof rgb>;
   muted: ReturnType<typeof rgb>;
   rule: ReturnType<typeof rgb>;
   green: ReturnType<typeof rgb>;
@@ -240,7 +225,7 @@ async function drawBlock(
     y: sigBoxY,
     width: sigBoxW,
     height: sigBoxH,
-    color: ctx.accentSoft,
+    color: ctx.paper,
     borderColor: ctx.rule,
     borderWidth: 0.6,
   });
@@ -277,9 +262,9 @@ async function drawBlock(
 
   const fieldsY = top - 112;
   const lines: [string, string][] = [
-    ["wallet", b.wallet],
-    ["attestation", b.attestationHash],
-    ["signed_at", new Date(b.signedAtUnix * 1000).toISOString()],
+    ["Wallet", b.wallet],
+    ["Attestation", formatAttestation(b.attestationHash)],
+    ["Signed at", formatSignedAt(b.signedAtUnix)],
   ];
   let yy = fieldsY;
   for (const [k, v] of lines) {
@@ -302,7 +287,7 @@ function drawField(
     color: ctx.muted,
   });
 
-  const chunks = chunkMonospace(value, 46);
+  const chunks = chunkMonospace(value, 28);
   chunks.forEach((chunk, index) => {
     page.drawText(chunk, {
       x: ctx.x + 96,
@@ -322,6 +307,19 @@ function chunkMonospace(value: string, size: number): string[] {
     chunks.push(value.slice(i, i + size));
   }
   return chunks;
+}
+
+function formatAttestation(hash: `0x${string}`): string {
+  if (/^0x0+$/.test(hash)) return "Pending on-chain attestation";
+  return hash;
+}
+
+function formatSignedAt(unixSeconds: number): string {
+  return new Intl.DateTimeFormat("en-NZ", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Pacific/Auckland",
+  }).format(new Date(unixSeconds * 1000));
 }
 
 // pdf-lib's embedPng is async and we want to keep drawBlock sync-ish; in

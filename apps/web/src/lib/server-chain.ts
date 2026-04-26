@@ -32,6 +32,7 @@ export type OnchainEscrow = {
   partyA: `0x${string}`;
   partyB: `0x${string}`;
   pdfHash: `0x${string}`;
+  pdfCid: string;
   token: `0x${string}`;
   amount: bigint;
   factory: `0x${string}`;
@@ -57,6 +58,7 @@ export async function readEscrow(
     partyA,
     partyB,
     pdfHash,
+    pdfCid,
     token,
     amount,
     factory,
@@ -85,6 +87,11 @@ export async function readEscrow(
       abi: escrowAbi,
       functionName: "pdfHash",
     }) as Promise<`0x${string}`>,
+    serverPublicClient.readContract({
+      address,
+      abi: escrowAbi,
+      functionName: "pdfCid",
+    }) as Promise<string>,
     serverPublicClient.readContract({
       address,
       abi: escrowAbi,
@@ -145,6 +152,7 @@ export async function readEscrow(
     partyA,
     partyB,
     pdfHash,
+    pdfCid,
     token,
     amount,
     factory,

@@ -4,6 +4,7 @@ import { attestations, contracts } from "@/server/db/schema";
 import { readEscrow, serverPublicClient } from "@/lib/server-chain";
 import { escrowAbi } from "@/lib/contracts/abis";
 import { appendAuditCertificate, type AuditCertEvent } from "@/lib/audit-cert";
+import { fetchPdfFromCid } from "@/lib/ipfs-gateway";
 
 export type BuildCertResult = {
   pdf: Uint8Array;
@@ -47,11 +48,9 @@ export async function buildAuditCertificate(
   }
 
   const cid = row.signedPdfCid ?? row.pdfCid;
-  const gateway =
-    process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? "https://ipfs.io/ipfs/";
-  const upstream = await fetch(`${gateway}${cid}`);
-  if (!upstream.ok) throw new CertError("ipfs fetch failed", 502);
-  const buf = await upstream.arrayBuffer();
+  const buf = await fetchPdfFromCid(cid).catch(() => {
+    throw new CertError("ipfs fetch failed", 502);
+  });
 
   const events = await collectLifecycle(address);
 

@@ -30,6 +30,7 @@ import {
 import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { isLocalhost } from "@/lib/isLocalhost";
+import { errorMessage, toastError } from "@/lib/error-toast";
 import { PdfViewer } from "./PdfViewer";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
@@ -67,6 +68,7 @@ type Result = {
   escrowAddress: `0x${string}`;
   secret: `0x${string}`;
   link: string;
+  signedPdfCid: string | null;
 };
 
 const STEPS: [string, Stage[]][] = [
@@ -326,6 +328,22 @@ function DetailsStep({
     return String(Math.max(1, remaining));
   });
 
+  const loadDemo = async () => {
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch("/demo-contract.pdf");
+      if (!res.ok) throw new Error("Could not load demo contract");
+      const blob = await res.blob();
+      const demoFile = new File([blob], "Demo_Contract.pdf", {
+        type: "application/pdf",
+      });
+      await handleFile(demoFile);
+    } catch (err) {
+      toastError("Demo load failed", err);
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleFile = async (selectedFile: File | null) => {
     setFile(selectedFile);
     if (!selectedFile) return;
@@ -352,12 +370,10 @@ function DetailsStep({
         if (data.daysUntilDeadline) setDays(String(data.daysUntilDeadline));
       } else {
         const errText = await res.text();
-        alert(`API Error: ${errText}`);
+        toastError("AI extraction failed", errText || `HTTP ${res.status}`);
       }
     } catch (err: unknown) {
-      console.error("AI Extraction failed", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-      alert(`Network Error: ${errorMessage}`);
+      toastError("AI extraction failed", err);
     } finally {
       setIsAnalyzing(false);
     }
@@ -434,7 +450,6 @@ function DetailsStep({
             {isAnalyzing ? "..." : file ? "REPLACE" : "BROWSE"}
           </span>
           <input
-            required
             type="file"
             accept="application/pdf"
             className="hidden"
@@ -442,6 +457,17 @@ function DetailsStep({
             disabled={isAnalyzing}
           />
         </label>
+
+        <button
+          type="button"
+          onClick={loadDemo}
+          disabled={isAnalyzing}
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 border border-accent bg-paper px-4 py-2.5 text-accent transition-colors hover:bg-accent hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ fontSize: 12 }}
+        >
+          <CornerDownRight size={13} />
+          <span>Or try the demo contract</span>
+        </button>
 
         <div className="mt-3">
           <FieldLabel>Title</FieldLabel>
@@ -698,7 +724,9 @@ function SignStep({
           setStampedFile(newFile);
         }
       } catch (err) {
-        console.error("Preview stamp error", err);
+        // Preview-only failure - the real stamp runs again post-tx.
+        // Surface it so users aren't left wondering why the preview is stale.
+        toastError("Couldn't render signed preview", err);
       }
     }
     stampPreview();
@@ -874,6 +902,7 @@ function SignStep({
               });
               if (!res.ok) throw new Error("Failed to save contract index");
 
+              let signedPdfCid: string | null = null;
               if (signatureDataUrl) {
                 const stamped = await appendSignatureCertificate(buf, [
                   {
@@ -912,6 +941,7 @@ function SignStep({
                     headers: { "content-type": "application/json" },
                     body: JSON.stringify({ signedPdfCid: signedCid }),
                   });
+                  signedPdfCid = signedCid;
                 }
               }
 
@@ -919,15 +949,12 @@ function SignStep({
                 escrowAddress: predicted,
                 secret,
                 link: shareLink(predicted, secret),
+                signedPdfCid,
               });
             } catch (err) {
-              setError(
-                showRawErrors
-                  ? err instanceof Error
-                    ? err.message
-                    : "Something went wrong"
-                  : "An error occurred.",
-              );
+              const message = errorMessage(err);
+              toastError("Sign & deploy failed", err);
+              setError(showRawErrors ? message : "An error occurred.");
               setStage("error");
             }
           }}
@@ -1024,7 +1051,10 @@ function ShareStep({
           </span>
         </div>
         <div className="px-8 py-6">
-          <PdfThumb height={300} title={details.title} />
+          <PdfViewer
+            escrowAddress={result.escrowAddress}
+            signed={Boolean(result.signedPdfCid)}
+          />
           <div
             className="mt-3.5 flex items-center gap-3.5 bg-paper px-4 py-3.5"
             style={{ border: "1px solid var(--color-accent)" }}

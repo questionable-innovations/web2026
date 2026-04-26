@@ -132,6 +132,13 @@ export const escrowAbi = [
   },
   {
     type: "function",
+    name: "pdfCid",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
     name: "factory",
     stateMutability: "view",
     inputs: [],

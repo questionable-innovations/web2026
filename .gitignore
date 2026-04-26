@@ -42,3 +42,5 @@ apps/web/src/lib/contracts/generated.ts
 .tools/
 
 apps/web/data/
+
+apps/web/tsconfig.tsbuildinfo

@@ -15,6 +15,7 @@ import { activeChain, getDepositTokenByAddress } from "@/lib/chain";
 import { erc20Abi, escrowAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { isLocalhost } from "@/lib/isLocalhost";
+import { errorMessage, toastError } from "@/lib/error-toast";
 import { SignaturePad } from "./SignaturePad";
 import { WalletGate } from "./WalletGate";
 import { ChainGate } from "./ChainGate";
@@ -291,21 +292,17 @@ function Inner({
           }
         }
       } catch (err) {
-        console.error("Stamped PDF best-effort path failed", err);
         // Non-fatal: the on-chain commitment is what matters; the
-        // stamped artifact is best-effort.
+        // stamped artifact is best-effort. Toast so users notice if
+        // the audit copy didn't make it.
+        toastError("Signed PDF stamp failed (audit copy only)", err);
       }
 
       onDone();
     } catch (err) {
-      console.error("Party B sign-and-deposit flow failed", err);
-      setError(
-        showRawErrors
-          ? err instanceof Error
-            ? err.message
-            : "Something went wrong"
-          : "An error occurred.",
-      );
+      const message = errorMessage(err);
+      toastError("Sign & deposit failed", err);
+      setError(showRawErrors ? message : "An error occurred.");
       setStage("error");
     }
   }

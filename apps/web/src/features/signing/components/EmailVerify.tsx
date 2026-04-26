@@ -37,9 +37,8 @@ export function EmailVerify({
         <div className="flex gap-2">
           <input
             inputMode="numeric"
-            maxLength={6}
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             placeholder="123456"
             className="flex-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 tracking-widest"
           />

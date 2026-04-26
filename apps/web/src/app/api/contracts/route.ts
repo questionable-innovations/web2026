@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq, or, desc } from "drizzle-orm";
+import { parseUnits } from "viem";
 import { db } from "@/lib/db";
 import { contracts, attestations } from "@/server/db/schema";
 import { randomUUID } from "node:crypto";
-import { readEscrow } from "@/lib/server-chain";
+import { getDepositTokenByAddress } from "@/lib/chain";
+import { erc20Abi } from "@/lib/contracts/abis";
+import { readEscrow, serverPublicClient } from "@/lib/server-chain";
+import { POSITIVE_DECIMAL_PATTERN } from "@/lib/input";
 
 const Body = z.object({
   title: z.string().min(1),
   counterpartyEmail: z.string().email(),
   counterpartyName: z.string().min(1).optional(),
-  amount: z.string().regex(/^\d+(\.\d+)?$/),
-  totalDue: z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  amount: z.string().regex(POSITIVE_DECIMAL_PATTERN),
+  totalDue: z.string().regex(POSITIVE_DECIMAL_PATTERN).optional(),
   depositToken: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   pdfHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   pdfCid: z.string().min(1),
@@ -92,6 +96,19 @@ export async function POST(req: Request) {
   if (onchain.token.toLowerCase() !== depositToken.toLowerCase()) {
     return NextResponse.json(
       { error: "deposit token mismatch" },
+      { status: 409 },
+    );
+  }
+  const tokenDecimals = await serverPublicClient
+    .readContract({
+      address: depositToken as `0x${string}`,
+      abi: erc20Abi,
+      functionName: "decimals",
+    })
+    .catch(() => getDepositTokenByAddress(depositToken).decimals);
+  if (onchain.amount !== parseUnits(d.amount, tokenDecimals as number)) {
+    return NextResponse.json(
+      { error: "deposit amount mismatch" },
       { status: 409 },
     );
   }

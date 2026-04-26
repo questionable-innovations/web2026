@@ -2,6 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 import pdfParse from "pdf-parse";
+import { isPositiveDecimalInput, sanitizeDecimalInput } from "@/lib/input";
 
 export async function POST(req: Request) {
   try {
@@ -61,7 +62,23 @@ export async function POST(req: Request) {
       prompt: `Analyze the following contract document text and extract the key details defined by the schema. If a piece of information is completely missing from the text, omit the field entirely or return an empty string. Do not invent information.\n\nDocument Text:\n${pdfText}`,
     });
 
-    return Response.json(object);
+    const amount = object.amount
+      ? sanitizeDecimalInput(String(object.amount))
+      : undefined;
+    const totalDue = object.totalDue
+      ? sanitizeDecimalInput(String(object.totalDue))
+      : undefined;
+
+    return Response.json({
+      ...object,
+      amount: amount && isPositiveDecimalInput(amount) ? amount : undefined,
+      totalDue:
+        totalDue && isPositiveDecimalInput(totalDue) ? totalDue : undefined,
+      daysUntilDeadline:
+        object.daysUntilDeadline && object.daysUntilDeadline > 0
+          ? Math.floor(object.daysUntilDeadline)
+          : undefined,
+    });
   } catch (error: unknown) {
     console.error("PDF Extraction error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";

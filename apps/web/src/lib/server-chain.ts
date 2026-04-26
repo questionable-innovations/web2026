@@ -10,9 +10,14 @@ const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL;
 /// Server-side viem client. Used by API routes to verify that on-chain state
 /// matches what a client claims before persisting to the off-chain index -
 /// without this, anyone with an escrow address could POST forged metadata.
+///
+/// `batch.multicall` collapses readEscrow's 12 parallel eth_calls into one
+/// multicall3 request - the public Fuji RPC was timing out individual calls
+/// when fired in a burst. `retryCount` covers the rest of the flakiness.
 export const serverPublicClient = createPublicClient({
   chain,
-  transport: http(rpcUrl),
+  transport: http(rpcUrl, { retryCount: 3, timeout: 15_000 }),
+  batch: { multicall: true },
 });
 
 const STATE_NAMES = [

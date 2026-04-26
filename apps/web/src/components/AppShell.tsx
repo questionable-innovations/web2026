@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 import { useAccount } from "wagmi";
+import logoIcon from "@/app/logodealsealicononly.png";
 import { UserMenu } from "@/components/UserMenu";
 
 export type ContractState =
@@ -20,10 +22,17 @@ export function BrandMark({ size = 22 }: { size?: number }) {
   return (
     <Link
       href="/"
-      className="font-serif text-ink"
+      className="inline-flex items-center gap-2 font-serif text-ink"
       style={{ fontSize: size, letterSpacing: -0.4, lineHeight: 1 }}
     >
-      DealSeal
+      <Image
+        src={logoIcon}
+        alt="DealSeal logo"
+        width={Math.round(size)}
+        height={Math.round(size)}
+        className="shrink-0"
+      />
+      <span>DealSeal</span>
     </Link>
   );
 }

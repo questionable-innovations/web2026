@@ -1280,7 +1280,40 @@ function ShareStep({
   details: Details;
 }) {
   const [copied, setCopied] = useState(false);
+  const [sendStage, setSendStage] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
+  const [sendError, setSendError] = useState<string | null>(null);
   const trimmedAddr = `${result.escrowAddress.slice(0, 6)}…${result.escrowAddress.slice(-4)}`;
+
+  async function sendEmail() {
+    if (sendStage === "sending" || sendStage === "sent") return;
+    setSendStage("sending");
+    setSendError(null);
+    try {
+      const res = await fetch(
+        `/api/contracts/${result.escrowAddress}/share`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ link: result.link }),
+        },
+      );
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: unknown;
+        };
+        throw new Error(
+          typeof payload.error === "string" ? payload.error : "send failed",
+        );
+      }
+      setSendStage("sent");
+    } catch (err) {
+      setSendStage("error");
+      setSendError(err instanceof Error ? err.message : "send failed");
+    }
+  }
+
   return (
     <div className="grid gap-6" style={{ gridTemplateColumns: "1fr 0.9fr" }}>
       <div className="border border-rule bg-card">
@@ -1376,21 +1409,44 @@ function ShareStep({
             never indexed.
           </div>
 
-          <a
-            href={`mailto:${details.counterpartyEmail}?subject=${encodeURIComponent(`Sign & seal: ${details.title}`)}&body=${encodeURIComponent(result.link)}`}
-            className="mt-4 flex items-center justify-between bg-ink px-4 py-3.5 text-paper"
+          <button
+            type="button"
+            onClick={sendEmail}
+            disabled={sendStage === "sending" || sendStage === "sent"}
+            className="mt-4 flex w-full items-center justify-between bg-ink px-4 py-3.5 text-paper disabled:opacity-70"
           >
             <span style={{ fontSize: 13 }}>
-              Email {details.counterpartyName.split(" ")[0]} the link
+              {sendStage === "sent"
+                ? `Sent to ${details.counterpartyName.split(" ")[0]}`
+                : `Email ${details.counterpartyName.split(" ")[0]} the link`}
             </span>
             <span
               className="inline-flex items-center gap-1.5 font-mono text-accent"
               style={{ fontSize: 11 }}
             >
-              SEND
-              <ArrowRight size={12} />
+              {sendStage === "sending" && "SENDING…"}
+              {sendStage === "sent" && (
+                <>
+                  SENT
+                  <Check size={12} strokeWidth={2.5} />
+                </>
+              )}
+              {(sendStage === "idle" || sendStage === "error") && (
+                <>
+                  SEND
+                  <ArrowRight size={12} />
+                </>
+              )}
             </span>
-          </a>
+          </button>
+          {sendStage === "error" && sendError && (
+            <p
+              className="mt-2 font-mono text-accent"
+              style={{ fontSize: 11 }}
+            >
+              {sendError}
+            </p>
+          )}
         </div>
 
         <div

@@ -75,10 +75,20 @@ export function WalletGate({
             tag: "OAUTH · sign in with Google",
             onSelect: () => {
               void runEmbeddedLogin("privy-google", async () => {
-                if (!loginWithOAuth?.initOAuth) {
+                if (loginWithOAuth?.initOAuth) {
+                  try {
+                    await loginWithOAuth.initOAuth({ provider: "google" });
+                    return;
+                  } catch (err) {
+                    console.error("Privy Google OAuth init failed", err);
+                    // Fallback to the default Privy modal flow if direct OAuth
+                    // init fails (eg provider config mismatch).
+                  }
+                }
+                if (!privy?.login) {
                   throw new Error("Google OAuth is not available");
                 }
-                await loginWithOAuth.initOAuth({ provider: "google" });
+                await privy.login();
               });
             },
             isPending: embeddedPendingKey === "privy-google",
@@ -226,6 +236,7 @@ export function WalletGate({
     try {
       await action();
     } catch (err) {
+      console.error("Embedded wallet login failed", err);
       setEmbeddedError(
         err instanceof Error ? err.message : "Something went wrong",
       );
@@ -436,7 +447,8 @@ function pad2(n: number): string {
 function useSafePrivy() {
   try {
     return usePrivy();
-  } catch {
+  } catch (err) {
+    console.error("usePrivy hook unavailable", err);
     return null;
   }
 }
@@ -444,7 +456,8 @@ function useSafePrivy() {
 function useSafeLoginWithOAuth() {
   try {
     return useLoginWithOAuth();
-  } catch {
+  } catch (err) {
+    console.error("useLoginWithOAuth hook unavailable", err);
     return null;
   }
 }

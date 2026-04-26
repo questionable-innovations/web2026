@@ -104,6 +104,7 @@ function Onboarding({
       const { profile } = (await res.json()) as { profile: Profile };
       onSaved(profile);
     } catch (err) {
+      console.error("Profile save failed", err);
       onError(err instanceof Error ? err.message : "save failed");
       setSaving(false);
     }

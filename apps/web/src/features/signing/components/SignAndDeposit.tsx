@@ -222,6 +222,12 @@ function Inner({
         } catch {
           // Keep the generic fallback if the response isn't JSON.
         }
+        console.error("Countersign index save failed", {
+          escrowAddress: info.escrowAddress,
+          status: countersignRes.status,
+          statusText: countersignRes.statusText,
+          message,
+        });
         throw new Error(message);
       }
 
@@ -260,20 +266,39 @@ function Inner({
           const pin = await fetch("/api/ipfs", { method: "POST", body: fd });
           if (pin.ok) {
             const { cid: signedCid } = (await pin.json()) as { cid: string };
-            await fetch(`/api/contracts/${info.escrowAddress}/signed`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ signedPdfCid: signedCid }),
+            const signedRes = await fetch(
+              `/api/contracts/${info.escrowAddress}/signed`,
+              {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ signedPdfCid: signedCid }),
+              },
+            );
+            if (!signedRes.ok) {
+              console.error("Signed PDF index update failed", {
+                escrowAddress: info.escrowAddress,
+                status: signedRes.status,
+                statusText: signedRes.statusText,
+                signedCid,
+              });
+            }
+          } else {
+            console.error("IPFS pin failed for stamped PDF", {
+              escrowAddress: info.escrowAddress,
+              status: pin.status,
+              statusText: pin.statusText,
             });
           }
         }
-      } catch {
+      } catch (err) {
+        console.error("Stamped PDF best-effort path failed", err);
         // Non-fatal: the on-chain commitment is what matters; the
         // stamped artifact is best-effort.
       }
 
       onDone();
     } catch (err) {
+      console.error("Party B sign-and-deposit flow failed", err);
       setError(
         showRawErrors
           ? err instanceof Error

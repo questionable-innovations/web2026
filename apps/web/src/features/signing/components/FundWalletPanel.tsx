@@ -48,8 +48,8 @@ export function FundWalletPanel({
       await navigator.clipboard.writeText(value);
       setCopied(kind);
       setTimeout(() => setCopied(null), 1400);
-    } catch {
-      // ignored
+    } catch (err) {
+      console.error("Clipboard copy failed", err);
     }
   }
 

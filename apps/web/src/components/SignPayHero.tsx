@@ -203,7 +203,7 @@ export function SignPayHero() {
             style={{ position: "absolute", inset: 0 }}
           >
           <circle r="78" fill="none" stroke={ink} strokeWidth="1" opacity="0.2" />
-          <circle r="62" fill={accent} />
+            <circle r="62" fill="#fff" />
           <circle r="62" fill="none" stroke={ink} strokeOpacity="0.2" strokeWidth="1" />
           {Array.from({ length: 48 }, (_, i) => {
             const a = (i / 48) * Math.PI * 2;

@@ -43,7 +43,7 @@ export function AppNav({
     {
       k: "reputation",
       label: "Reputation",
-      href: wallet ? `/b/${wallet}` : "/#reputation",
+      href: wallet ? `/b/${wallet}` : "/b",
     },
     { k: "admin", label: "Admin", href: "/admin" },
   ];

@@ -326,6 +326,24 @@ function DetailsStep({
     return String(Math.max(1, remaining));
   });
 
+  const loadDemo = async () => {
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch("/demo-contract.pdf");
+      if (!res.ok) throw new Error("Could not load demo contract");
+      const blob = await res.blob();
+      const demoFile = new File([blob], "Demo_Contract.pdf", {
+        type: "application/pdf",
+      });
+      await handleFile(demoFile);
+    } catch (err) {
+      console.error("Demo load failed", err);
+      const message = err instanceof Error ? err.message : "Unknown error";
+      alert(`Demo load failed: ${message}`);
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleFile = async (selectedFile: File | null) => {
     setFile(selectedFile);
     if (!selectedFile) return;
@@ -434,7 +452,6 @@ function DetailsStep({
             {isAnalyzing ? "..." : file ? "REPLACE" : "BROWSE"}
           </span>
           <input
-            required
             type="file"
             accept="application/pdf"
             className="hidden"
@@ -442,6 +459,17 @@ function DetailsStep({
             disabled={isAnalyzing}
           />
         </label>
+
+        <button
+          type="button"
+          onClick={loadDemo}
+          disabled={isAnalyzing}
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 border border-accent bg-paper px-4 py-2.5 text-accent transition-colors hover:bg-accent hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ fontSize: 12 }}
+        >
+          <CornerDownRight size={13} />
+          <span>Or try the demo contract</span>
+        </button>
 
         <div className="mt-3">
           <FieldLabel>Title</FieldLabel>

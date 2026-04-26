@@ -12,6 +12,47 @@ contract MockToken is ERC20 {
     }
 }
 
+contract MockAavePool {
+    IERC20 public immutable token;
+    mapping(address => uint256) public balances;
+    bool public shortfall;
+    bool public revertOnWithdraw;
+
+    constructor(IERC20 _token) {
+        token = _token;
+    }
+
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
+        require(asset == address(token), "asset");
+        token.transferFrom(msg.sender, address(this), amount);
+        balances[onBehalfOf] += amount;
+    }
+
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
+        require(asset == address(token), "asset");
+        if (revertOnWithdraw) revert("aave down");
+        uint256 available = balances[msg.sender];
+        uint256 withdrawn = amount == type(uint256).max || amount > available ? available : amount;
+        if (shortfall && withdrawn > 1) withdrawn -= 1;
+        balances[msg.sender] = available - withdrawn;
+        token.transfer(to, withdrawn);
+        return withdrawn;
+    }
+
+    function accrue(address account, uint256 amount) external {
+        token.transferFrom(msg.sender, address(this), amount);
+        balances[account] += amount;
+    }
+
+    function setShortfall(bool value) external {
+        shortfall = value;
+    }
+
+    function setRevertOnWithdraw(bool value) external {
+        revertOnWithdraw = value;
+    }
+}
+
 contract EscrowTest is Test {
     EscrowFactory factory;
     Escrow impl;
@@ -23,7 +64,7 @@ contract EscrowTest is Test {
 
     function setUp() public {
         impl = new Escrow();
-        factory = new EscrowFactory(address(impl), address(0), address(0));
+        factory = new EscrowFactory(address(impl), address(0), address(0), address(0));
         token = new MockToken();
         alice = vm.createWallet("alice");
         bob = vm.createWallet("bob");
@@ -341,5 +382,107 @@ contract EscrowTest is Test {
         vm.expectRevert(Escrow.CannotApproveOwnProposal.selector);
         e.approveRelease();
         vm.stopPrank();
+    }
+
+    function test_aaveSupportedTokenSuppliesAndSkimsInterest() public {
+        MockAavePool pool = new MockAavePool(token);
+        address platformWallet = address(0xBEEF);
+        factory = new EscrowFactory(address(impl), platformWallet, address(pool), address(token));
+        Escrow e = _createWithSig();
+        bytes32 pdfHash = keccak256("pdf-bytes");
+        (Escrow.Attestation memory aB, bytes memory sigB) =
+            _attest(bob, address(e), pdfHash, 0);
+
+        vm.startPrank(bob.addr);
+        token.approve(address(e), 1_000 ether);
+        e.countersign(SECRET, aB, sigB);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(address(e)), 0);
+        assertEq(pool.balances(address(e)), 1_000 ether);
+
+        token.approve(address(pool), 25 ether);
+        pool.accrue(address(e), 25 ether);
+
+        vm.prank(bob.addr);
+        e.proposeRelease();
+        vm.prank(alice.addr);
+        e.approveRelease();
+
+        uint256 aliceBefore = token.balanceOf(alice.addr);
+        e.withdraw();
+
+        assertEq(token.balanceOf(alice.addr) - aliceBefore, 1_000 ether);
+        assertEq(token.balanceOf(platformWallet), 25 ether);
+        assertEq(uint8(e.state()), uint8(Escrow.State.Closed));
+    }
+
+    function test_aaveUnsupportedTokenDoesNotCallPool() public {
+        MockToken otherToken = new MockToken();
+        MockAavePool pool = new MockAavePool(otherToken);
+        factory = new EscrowFactory(address(impl), alice.addr, address(pool), address(otherToken));
+
+        Escrow e = _createWithSig();
+        bytes32 pdfHash = keccak256("pdf-bytes");
+        (Escrow.Attestation memory aB, bytes memory sigB) =
+            _attest(bob, address(e), pdfHash, 0);
+
+        vm.startPrank(bob.addr);
+        token.approve(address(e), 1_000 ether);
+        e.countersign(SECRET, aB, sigB);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(address(e)), 1_000 ether);
+        assertEq(pool.balances(address(e)), 0);
+    }
+
+    function test_aaveShortfallRevertsWithoutClosing() public {
+        MockAavePool pool = new MockAavePool(token);
+        factory = new EscrowFactory(address(impl), alice.addr, address(pool), address(token));
+        Escrow e = _createWithSig();
+        bytes32 pdfHash = keccak256("pdf-bytes");
+        (Escrow.Attestation memory aB, bytes memory sigB) =
+            _attest(bob, address(e), pdfHash, 0);
+
+        vm.startPrank(bob.addr);
+        token.approve(address(e), 1_000 ether);
+        e.countersign(SECRET, aB, sigB);
+        e.proposeRelease();
+        vm.stopPrank();
+
+        vm.prank(alice.addr);
+        e.approveRelease();
+
+        pool.setShortfall(true);
+        vm.expectRevert(Escrow.AaveShortfall.selector);
+        e.withdraw();
+
+        assertEq(uint8(e.state()), uint8(Escrow.State.Released));
+        assertEq(e.withdrawable(), 1_000 ether);
+    }
+
+    function test_rescueStillWorksWhenAaveWithdrawReverts() public {
+        MockAavePool pool = new MockAavePool(token);
+        factory = new EscrowFactory(address(impl), alice.addr, address(pool), address(token));
+        Escrow e = _createWithSig();
+        bytes32 pdfHash = keccak256("pdf-bytes");
+        (Escrow.Attestation memory aB, bytes memory sigB) =
+            _attest(bob, address(e), pdfHash, 0);
+
+        vm.startPrank(bob.addr);
+        token.approve(address(e), 1_000 ether);
+        e.countersign(SECRET, aB, sigB);
+        vm.stopPrank();
+
+        pool.setRevertOnWithdraw(true);
+        token.transfer(address(e), 3 ether);
+
+        vm.warp(block.timestamp + 396 days);
+        uint256 bobBefore = token.balanceOf(bob.addr);
+        vm.prank(bob.addr);
+        e.rescue();
+
+        assertEq(token.balanceOf(bob.addr) - bobBefore, 3 ether);
+        assertEq(uint8(e.state()), uint8(Escrow.State.Rescued));
     }
 }

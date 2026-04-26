@@ -1,4 +1,4 @@
-import { inArray, desc } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contracts } from "@/server/db/schema";
 import { AdminContractsTable } from "./AdminContractsTable";
@@ -8,14 +8,19 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminPage() {
-  // Funds are in Aave (and accruing) until withdraw() lands and state
-  // becomes Closed. Released still holds the deposit, so include it -
-  // otherwise the interest readout drops to zero the moment both parties
-  // approve, even though the money is still in the pool.
-  const activeContracts = await db
-    .select()
-    .from(contracts)
-    .orderBy(desc(contracts.createdAt));
+  let loadError: string | null = null;
+  let activeContracts: (typeof contracts.$inferSelect)[] = [];
+  try {
+    activeContracts = await db
+      .select()
+      .from(contracts)
+      .orderBy(desc(contracts.createdAt));
+  } catch (error: unknown) {
+    loadError =
+      error instanceof Error
+        ? error.message
+        : "Unable to read the contract index.";
+  }
 
   // Ensure dates are parsed to strings to avoid Next.js Server-to-Client serialization issues
   const serializedContracts = activeContracts.map((c) => ({
@@ -24,16 +29,30 @@ export default async function AdminPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-paper">
       <AppNav active={"admin"} />
-      <div className="container mx-auto py-10 px-4 md:px-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Platform Admin</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 max-w-2xl">
-            Monitor active escrow contracts and platform interest gains from Aave integration.
-          </p>
+      <div className="px-5 py-7 md:px-9 md:py-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-7 flex flex-col gap-4 border-b border-rule pb-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="ds-eyebrow">Platform operations</div>
+              <h1
+                className="mt-1.5 font-serif font-normal"
+                style={{ fontSize: 44, lineHeight: 1.08 }}
+              >
+                Admin overview
+              </h1>
+            </div>
+            <p className="max-w-xl text-sm leading-6 text-muted">
+              Full contract inventory with Aave yield monitoring, contract state
+              mix, and funding visibility across the platform.
+            </p>
+          </div>
 
-          <AdminContractsTable contracts={serializedContracts} />
+          <AdminContractsTable
+            contracts={serializedContracts}
+            loadError={loadError}
+          />
         </div>
       </div>
     </div>

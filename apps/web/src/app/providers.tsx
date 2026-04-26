@@ -30,7 +30,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         appearance: { theme: "dark", accentColor: "#b7d257" },
         defaultChain: activeChain,
         supportedChains: [activeChain],
-        embeddedWallets: { createOnLogin: "users-without-wallets" },
+        embeddedWallets: {
+          ethereum: { createOnLogin: "users-without-wallets" },
+        },
       }}
     >
       <SmartWalletsProvider>

@@ -31,8 +31,11 @@ import { erc20Abi, escrowAbi, escrowFactoryAbi } from "@/lib/contracts/abis";
 import { appendSignatureCertificate } from "@/lib/pdf-stamp";
 import { isLocalhost } from "@/lib/isLocalhost";
 import {
+  compareDecimalInputs,
   decimalInputError,
   isPositiveDecimalInput,
+  percentFromDecimalInputs,
+  percentOfDecimalInput,
   sanitizeDecimalInput,
 } from "@/lib/input";
 import { PdfViewer } from "./PdfViewer";
@@ -313,6 +316,9 @@ function DetailsStep({
   const [totalDue, setTotalDue] = useState(() =>
     sanitizeDecimalInput(initial?.totalDue ?? ""),
   );
+  const [depositPercent, setDepositPercent] = useState(() =>
+    percentFromDecimalInputs(initial?.amount ?? "", initial?.totalDue ?? ""),
+  );
   const [depositTokenId, setDepositTokenId] = useState(
     initial?.depositToken.id ?? depositToken.id,
   );
@@ -362,9 +368,30 @@ function DetailsStep({
         if (data.title) setTitle(data.title);
         if (data.counterpartyName) setCounterpartyName(data.counterpartyName);
         if (data.counterpartyEmail) setCounterpartyEmail(data.counterpartyEmail);
-        if (data.amount) setAmount(sanitizeDecimalInput(String(data.amount)));
+        const extractedAmount = data.amount
+          ? sanitizeDecimalInput(String(data.amount))
+          : "";
+        const extractedTotalDue = data.totalDue
+          ? sanitizeDecimalInput(String(data.totalDue))
+          : "";
         if (data.totalDue) {
-          setTotalDue(sanitizeDecimalInput(String(data.totalDue)));
+          setTotalDue(extractedTotalDue);
+        }
+        if (extractedAmount && extractedTotalDue) {
+          const extractedPercent = percentFromDecimalInputs(
+            extractedAmount,
+            extractedTotalDue,
+          );
+          setDepositPercent(extractedPercent);
+          setAmount(
+            percentOfDecimalInput(
+              extractedTotalDue,
+              extractedPercent,
+              selectedToken.decimals,
+            ),
+          );
+        } else if (extractedAmount) {
+          setAmount(extractedAmount);
         }
         if (data.daysUntilDeadline) setDays(String(data.daysUntilDeadline));
       } else {
@@ -383,24 +410,43 @@ function DetailsStep({
   const selectedToken =
     depositTokens.find((token) => token.id === depositTokenId) ?? depositToken;
   const amountValid = isPositiveDecimalInput(amount);
-  const totalDueValid = !totalDue || isPositiveDecimalInput(totalDue);
+  const totalDueValid = isPositiveDecimalInput(totalDue);
+  const percentValid = depositPercent > 0 && depositPercent <= 100;
+  const depositWithinTotal =
+    !amountValid ||
+    !totalDueValid ||
+    compareDecimalInputs(amount, totalDue) <= 0;
   const dayCount = Number(days);
   const daysValid =
     days.trim() !== "" && Number.isInteger(dayCount) && dayCount > 0;
-  const canContinue = Boolean(file) && amountValid && totalDueValid && daysValid;
-  const moneyError = !amount
-    ? "Deposit is required."
-    : !amountValid
-      ? decimalInputError("Deposit")
-      : totalDue && !totalDueValid
-        ? decimalInputError("Total due")
-        : null;
+  const canContinue =
+    Boolean(file) &&
+    amountValid &&
+    totalDueValid &&
+    percentValid &&
+    depositWithinTotal &&
+    daysValid;
+  const moneyError = !totalDue
+    ? "Total due is required."
+    : !totalDueValid
+      ? decimalInputError("Total due")
+      : !percentValid
+        ? "Deposit must be more than 0%."
+        : !amount
+          ? "Deposit is required."
+          : !amountValid
+            ? decimalInputError("Deposit")
+        : !depositWithinTotal
+          ? "Deposit cannot be more than total due."
+          : null;
   const deadlineError =
     days && !daysValid ? "Deadline must be at least 1 day." : null;
   const visibleError =
     formError ??
-    (amount && !amountValid ? decimalInputError("Deposit") : null) ??
     (totalDue && !totalDueValid ? decimalInputError("Total due") : null) ??
+    (totalDueValid && !percentValid ? "Deposit must be more than 0%." : null) ??
+    (amount && !amountValid ? decimalInputError("Deposit") : null) ??
+    (!depositWithinTotal ? "Deposit cannot be more than total due." : null) ??
     deadlineError;
 
   const deadlineLabel = useMemo(() => {
@@ -545,11 +591,27 @@ function DetailsStep({
             value={totalDue}
             onChange={(e) => {
               setFormError(null);
-              setTotalDue(
-                sanitizeDecimalInput(e.target.value, selectedToken.decimals),
+              const nextTotalDue = sanitizeDecimalInput(
+                e.target.value,
+                selectedToken.decimals,
+              );
+              const nextPercent =
+                depositPercent === 0 && amount
+                  ? percentFromDecimalInputs(amount, nextTotalDue)
+                  : depositPercent;
+              setTotalDue(nextTotalDue);
+              setDepositPercent(nextPercent);
+              setAmount(
+                percentOfDecimalInput(
+                  nextTotalDue,
+                  nextPercent,
+                  selectedToken.decimals,
+                ),
               );
             }}
-            aria-invalid={Boolean(totalDue && !totalDueValid)}
+            aria-invalid={Boolean(
+              totalDue && (!totalDueValid || !depositWithinTotal),
+            )}
             placeholder="10,000.00"
             className="flex-1 bg-transparent font-serif outline-none"
             style={{ fontSize: 32, lineHeight: 1 }}
@@ -564,39 +626,54 @@ function DetailsStep({
 
         <div style={{ height: 22 }} />
         <div className="ds-eyebrow mb-2">Deposit</div>
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: "1.6fr 1fr" }}
-        >
+        <div className="grid gap-3" style={{ gridTemplateColumns: "1.6fr 1fr" }}>
           <div
-            className="flex items-baseline gap-2 bg-paper px-4 py-3.5"
+            className="bg-paper px-4 py-3.5"
             style={{ border: "1px solid var(--color-accent)" }}
           >
-            <span className="font-mono text-muted" style={{ fontSize: 12 }}>
-              NZD
-            </span>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-mono text-muted" style={{ fontSize: 12 }}>
+                {depositPercent}%
+              </span>
+              <span
+                className="font-mono uppercase text-muted"
+                style={{ fontSize: 10, letterSpacing: 1 }}
+              >
+                = {amount || "-"} {selectedToken.symbol}
+              </span>
+            </div>
             <input
-              required
-              inputMode="decimal"
-              onKeyDown={blockNonDecimalKey}
-              value={amount}
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={depositPercent}
+              disabled={!totalDueValid}
               onChange={(e) => {
                 setFormError(null);
+                const nextPercent = Number(e.target.value);
+                setDepositPercent(nextPercent);
                 setAmount(
-                  sanitizeDecimalInput(e.target.value, selectedToken.decimals),
+                  percentOfDecimalInput(
+                    totalDue,
+                    nextPercent,
+                    selectedToken.decimals,
+                  ),
                 );
               }}
-              aria-invalid={Boolean(amount && !amountValid)}
-              placeholder="4,800.00"
-              className="flex-1 bg-transparent font-serif outline-none"
-              style={{ fontSize: 32, lineHeight: 1 }}
+              aria-invalid={Boolean(
+                !percentValid || (amount && !depositWithinTotal),
+              )}
+              className="mt-3 w-full accent-[var(--color-accent)]"
             />
-            <span
-              className="font-mono uppercase text-muted"
-              style={{ fontSize: 10, letterSpacing: 1 }}
+            <div
+              className="mt-2 flex justify-between font-mono text-muted"
+              style={{ fontSize: 10 }}
             >
-              = {amount || "-"} {selectedToken.symbol}
-            </span>
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
           </div>
           <div>
             <FieldLabel>Deadline</FieldLabel>
@@ -931,7 +1008,7 @@ function SignStep({
                   counterpartyName: details.counterpartyName,
                   amount: details.amount,
                   depositToken: details.depositToken.address,
-                  totalDue: details.totalDue || undefined,
+                  totalDue: details.totalDue,
                   pdfHash,
                   pdfCid: cid,
                   escrowAddress: predicted,

@@ -8,14 +8,14 @@ import { randomUUID } from "node:crypto";
 import { getDepositTokenByAddress } from "@/lib/chain";
 import { erc20Abi } from "@/lib/contracts/abis";
 import { readEscrow, serverPublicClient } from "@/lib/server-chain";
-import { POSITIVE_DECIMAL_PATTERN } from "@/lib/input";
+import { compareDecimalInputs, POSITIVE_DECIMAL_PATTERN } from "@/lib/input";
 
 const Body = z.object({
   title: z.string().min(1),
   counterpartyEmail: z.string().email(),
   counterpartyName: z.string().min(1).optional(),
   amount: z.string().regex(POSITIVE_DECIMAL_PATTERN),
-  totalDue: z.string().regex(POSITIVE_DECIMAL_PATTERN).optional(),
+  totalDue: z.string().regex(POSITIVE_DECIMAL_PATTERN),
   depositToken: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   pdfHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   pdfCid: z.string().min(1),
@@ -60,6 +60,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const d = parsed.data;
+  if (compareDecimalInputs(d.amount, d.totalDue) > 0) {
+    return NextResponse.json(
+      { error: "deposit cannot be more than total due" },
+      { status: 400 },
+    );
+  }
 
   // Verify on-chain state matches the claim before persisting. Without this,
   // anyone could POST arbitrary metadata against any escrow address and

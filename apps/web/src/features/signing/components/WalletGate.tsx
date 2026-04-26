@@ -75,19 +75,10 @@ export function WalletGate({
             tag: "OAUTH · sign in with Google",
             onSelect: () => {
               void runEmbeddedLogin("privy-google", async () => {
-                if (loginWithOAuth?.initOAuth) {
-                  try {
-                    await loginWithOAuth.initOAuth({ provider: "google" });
-                    return;
-                  } catch {
-                    // Fallback to the default Privy modal flow if direct OAuth
-                    // init fails (eg provider config mismatch).
-                  }
+                if (!loginWithOAuth?.initOAuth) {
+                  throw new Error("Google OAuth is not available");
                 }
-                if (!privy) {
-                  throw new Error("Privy is not available");
-                }
-                await privy.login();
+                await loginWithOAuth.initOAuth({ provider: "google" });
               });
             },
             isPending: embeddedPendingKey === "privy-google",
